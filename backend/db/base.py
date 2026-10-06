@@ -25,7 +25,10 @@ def get_engine():
         s = get_settings()
         _engine = create_async_engine(
             s.database_url,
-            pool_pre_ping=True,
+            # 实测坑(2026-10-06):asyncpg + pool_pre_ping 在 checkout 时 ping 会触发
+            # MissingGreenlet(greenlet_spawn has not been called)——改为 pool_recycle 防陈旧连接。
+            pool_pre_ping=False,
+            pool_recycle=1800,          # 30 分钟回收,防休眠/空闲后的死连接
             pool_size=5,
             max_overflow=5,
         )

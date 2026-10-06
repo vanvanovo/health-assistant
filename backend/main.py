@@ -1,5 +1,5 @@
 # backend/main.py
-# 个人健康助手 · FastAPI 网关入口(P0 骨架版:健康检查 + 基础中间件)。
+# 个人健康助手 · FastAPI 网关入口(含 MCP 子应用挂载与 X-MCP-Key 鉴权)。
 
 from contextlib import asynccontextmanager
 
@@ -9,8 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import get_settings
 from backend.core.llm import load_providers
 from backend.core.logger import configure_logging, get_logger
+from backend.mcp.auth import ApiKeyAuthMiddleware
+from backend.mcp.health_server import mcp as health_mcp
 
 APP_VERSION = "0.1.0"
+
+# MCP 子应用(mount 不会传播子应用 lifespan,需在 lifespan 中手动驱动)
+_health_mcp_app = health_mcp.streamable_http_app()
+_health_app = ApiKeyAuthMiddleware(_health_mcp_app, get_settings().mcp_shared_key)
 
 
 @asynccontextmanager
@@ -24,8 +30,11 @@ async def lifespan(app: FastAPI):
         port=s.app_port,
         llm_chain=[f"{p.name}:{p.model}" for p in load_providers()],
         pg=f"{s.pg_host}:{s.pg_port}/{s.pg_db}",
+        mcp_auth=bool(s.mcp_shared_key),
     )
-    yield
+    async with _health_mcp_app.router.lifespan_context(_health_mcp_app):
+        log.info("app.started")
+        yield
     log.info("app.stop")
 
 
@@ -44,6 +53,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# MCP 健康工具(挂载前缀 /mcp/health,实际调用地址 {prefix}/mcp)
+app.mount("/mcp/health", _health_app)
 
 
 @app.get("/health")
