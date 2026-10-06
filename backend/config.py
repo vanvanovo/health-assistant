@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     mcp_timeout_seconds: int = 5
     mcp_health_url: str = "http://localhost:8020/mcp/health"   # MCP 健康工具挂载前缀(调用地址 = {url}/mcp)
 
+    # ── P8 主动服务 ───────────────────────────────────────────
+    jobs_enabled: bool = True            # APScheduler 四类定时任务
+    job_trigger_enabled: bool = True     # 演示/验收入口 POST /api/v1/jobs/run
+
     # ── 嵌入(P9 启用,先留位)─────────────────────────────────
     embedding_provider: str = "local"
     embedding_model: str = "BAAI/bge-m3"

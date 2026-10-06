@@ -6,7 +6,7 @@
 
 - **V1 核心闭环 MVP ✅ 完成(2026-10-06,P0–P4)**:14 表数据底座(pgvector)/ MCP 四域 15 工具 / 记录·分析·计划三张 LangGraph 图 / 编排 + SSE / Vue3 工作台初版 / 意图评测 60/60
 - **V2 个性化与可视化 ✅ 完成(P5–P7)**:饮食双模式 / PostgresSaver 多轮记忆 + 记忆确认卡 / 画像页 / 热力图·四维雷达·完成率环形·对话联动高亮
-- V3 实施计划已出(**待评审**):P8 主动服务(提醒/简报/周报/预警 + 站内信)→ P9 健康知识 RAG + 安全边界
+- V3 实施计划已出(**进行中**):P8 主动服务 ✅(提醒/简报/周报/预警 + 站内信)→ P9 健康知识 RAG + 安全边界
 
 ## 快速开始(本机)
 
@@ -38,6 +38,7 @@ cd frontend; npm install; npm run dev
 | `scripts/check_e2e.py` | P4–P7 端到端(**28 断言**:SSE/看板/饮食/记忆/鉴权) |
 | `scripts/check_diet.py` | P5 饮食真实链路(10 断言) |
 | `scripts/check_memory.py phase1\|phase2` | P6 多轮指代 + 重启记忆(phase1 后请重启网关再跑 phase2) |
+| `scripts/check_notify.py` | P8 主动服务(14 断言:四类消息/幂等/已读流转) |
 | `scripts/eval_intent.py` | 意图评测(**77 条**,报告落 docs/) |
 | `python -m pytest -q tests` | 离线回归(**97 用例**,全 mock) |
 

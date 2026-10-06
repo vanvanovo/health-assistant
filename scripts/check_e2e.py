@@ -163,6 +163,15 @@ async def main() -> int:
             "dashboard/radar 四维评分",
         )
 
+        # 7.5) 主动服务:手动触发四类任务 + 站内信/报告 REST
+        for job in ("remind", "brief", "weekly", "alert"):
+            r = await client.post(f"{BASE}/api/v1/jobs/run", json={"job": job}, headers=H)
+            check(r.status_code == 200, f"jobs/run {job} 200")
+        r = await client.get(f"{BASE}/api/v1/messages", headers=H)
+        check(r.status_code == 200 and r.json().get("count", 0) >= 1, "messages 有数据")
+        r = await client.get(f"{BASE}/api/v1/reports", headers=H)
+        check(r.status_code == 200 and r.json().get("count", 0) >= 1, "reports 有数据")
+
         # 8) 计划查询 + 表单打卡
         r = await client.get(f"{BASE}/api/v1/plans/current", headers=H)
         data = r.json()

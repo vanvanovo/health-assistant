@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter
 
-from backend.api.v1 import auth, chat, checkins, dashboard, memory, plans, profile
+from backend.api.v1 import auth, chat, checkins, dashboard, jobs, memory, messages, plans, profile, reports
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -13,3 +13,6 @@ api_router.include_router(plans.router)
 api_router.include_router(checkins.router)
 api_router.include_router(memory.router)
 api_router.include_router(profile.router)
+api_router.include_router(messages.router)
+api_router.include_router(reports.router)
+api_router.include_router(jobs.router)

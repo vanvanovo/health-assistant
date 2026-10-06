@@ -59,3 +59,18 @@ export async function applyMemory(token: string) {
   const { data } = await client.post('/memory/apply', { token })
   return data as { status: string; kind?: string; summary?: string }
 }
+
+export async function fetchMessages(unreadOnly = false) {
+  const { data } = await client.get('/messages', { params: { unread: unreadOnly } })
+  return data as { count: number; unread: number; messages: Array<any> }
+}
+
+export async function markMessagesRead(payload: { id?: number; all?: boolean }) {
+  const { data } = await client.post('/messages/read', payload)
+  return data as { updated: number; unread: number }
+}
+
+export async function fetchReports(type?: 'daily' | 'weekly') {
+  const { data } = await client.get('/reports', { params: { type } })
+  return data as { count: number; reports: Array<any> }
+}

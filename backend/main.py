@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.v1 import api_router
 from backend.config import get_settings
+from backend.core import scheduler
 from backend.core.assistant import init_assistant, saver_kind, shutdown_assistant
 from backend.core.llm import load_providers
 from backend.core.logger import configure_logging, get_logger
@@ -36,9 +37,12 @@ async def lifespan(app: FastAPI):
     )
     memory_kind = await init_assistant()
     log.info("app.memory_ready", kind=memory_kind)
+    jobs_on = await scheduler.start_scheduler()
+    log.info("app.jobs_ready", enabled=jobs_on)
     async with _health_mcp_app.router.lifespan_context(_health_mcp_app):
         log.info("app.started")
         yield
+    await scheduler.stop_scheduler()
     await shutdown_assistant()
     log.info("app.stop")
 
@@ -76,6 +80,7 @@ async def health():
         "version": APP_VERSION,
         "llm_providers": [p.name for p in load_providers()],
         "memory": saver_kind(),
+        "scheduler": scheduler.scheduler_running(),
     }
 
 
