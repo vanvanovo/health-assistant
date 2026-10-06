@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from backend.core.orchestrator import run_chat
+from backend.core.assistant import run_chat
 from backend.dependencies import get_current_user
 
 router = APIRouter(prefix="/chat", tags=["对话"])

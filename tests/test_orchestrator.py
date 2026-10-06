@@ -6,13 +6,21 @@ from datetime import date, timedelta
 import pytest
 
 from backend.agents.common.result import agent_result
-from backend.core import orchestrator
+from backend.core import assistant, orchestrator
+from backend.core.assistant import reset_assistant
 
 TODAY = date.today().isoformat()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_graph():
+    reset_assistant(None)
+    yield
+    reset_assistant(None)
+
+
 async def collect(message: str):
-    return [ev async for ev in orchestrator.run_chat(message)]
+    return [ev async for ev in assistant.run_chat(message)]
 
 
 def events(evs, name):
@@ -24,7 +32,7 @@ def full_text(evs):
 
 
 def patch_route(monkeypatch, routed=None, exc=None):
-    async def fake(user_input, today=None):
+    async def fake(user_input, today=None, history=None):
         if exc:
             raise exc
         return routed
@@ -186,3 +194,27 @@ async def test_out_of_scope_message(monkeypatch):
     patch_route(monkeypatch, {"intents": [{"name": "out_of_scope", "query": "讲个笑话"}], "slots": {}, "need_clarify": False, "clarify": "", "confidence": 0.9})
     evs = await collect("讲个笑话")
     assert "记录健康数据" in full_text(evs)
+
+
+@pytest.mark.asyncio
+async def test_multi_turn_memory_with_checkpointer(monkeypatch):
+    """挂 MemorySaver 后,第二轮请求能带上第一轮历史(多轮指代的基础)。"""
+    from langgraph.checkpoint.memory import MemorySaver
+
+    reset_assistant(MemorySaver())
+    seen_histories: list[list] = []
+
+    async def fake_route(user_input, today=None, history=None):
+        seen_histories.append(list(history or []))
+        return {"intents": [{"name": "analyze", "query": user_input}], "slots": {}, "need_clarify": False, "clarify": "", "confidence": 0.9}
+
+    monkeypatch.setattr(orchestrator, "route_intent", fake_route)
+    patch_agents(monkeypatch)
+
+    await collect("我最近一个月状态怎么样?")
+    await collect("那这周呢?")
+
+    assert len(seen_histories) == 2
+    assert seen_histories[0] == []
+    texts = [str(getattr(m, "content", m)) for m in seen_histories[1]]
+    assert any("我最近一个月" in t for t in texts)      # 第二轮带上了第一轮对话

@@ -648,6 +648,49 @@ async def get_plan_progress(week_start: str | None = None, user_id: int | None =
         return _ok({"week_start": ws.isoformat(), "progress": progress, "by_kind": by_kind, "missed": missed})
 
 
+@mcp.tool()
+async def list_plans(weeks: int = 4, user_id: int | None = None) -> str:
+    """返回最近 N 周计划概要(周起始/版本/状态/摘要/动作标题),按周从新到旧(供换项判断)。
+
+    Args:
+        weeks: 最近多少周(1~12,默认 4)
+    """
+    weeks = max(1, min(int(weeks), 12))
+    async with get_sessionmaker()() as session:
+        uid = await _resolve_user(session, user_id)
+        if not uid:
+            return _msg("not_found", "用户不存在")
+        rows = (
+            await session.execute(
+                select(M.Plan)
+                .where(M.Plan.user_id == uid)
+                .order_by(M.Plan.week_start.desc(), M.Plan.version.desc())
+            )
+        ).scalars().all()
+        picked, seen = [], set()
+        for p in rows:
+            key_s = p.week_start.isoformat()
+            if key_s in seen:
+                continue
+            seen.add(key_s)
+            picked.append(p)
+            if len(picked) >= weeks:
+                break
+        plans = []
+        for p in picked:
+            items = (
+                await session.execute(select(M.PlanItem).where(M.PlanItem.plan_id == p.id))
+            ).scalars().all()
+            plans.append({
+                "week_start": p.week_start.isoformat(),
+                "version": p.version,
+                "status": p.status,
+                "summary": p.summary,
+                "titles": [it.title for it in items if it.kind == "workout"],
+            })
+        return _ok({"count": len(plans), "plans": plans})
+
+
 # ── 营养域 ───────────────────────────────────────────────────
 def _food_view(f: M.NutritionFood) -> dict:
     kcal = _f(f.calories) or 0.0

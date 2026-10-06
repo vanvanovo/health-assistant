@@ -21,8 +21,24 @@ def target_week_start(today: date) -> date:
     return this_monday + timedelta(days=7)
 
 
-def compute_constraints(summary: dict, profile: dict, events: list[dict], week_start: date) -> dict:
-    """规则算约束:强度档 + 目标周轻量日 + 规避项 + 可用训练日。"""
+def _repeat_titles(history_plans: list[dict], threshold: int = 4) -> list[str]:
+    """近 N 周连续出现(从最近一周往前数)的 workout 标题;history_plans 需按周从新到旧。"""
+    streak: dict[str, int] = {}
+    for week in history_plans:
+        titles = set(week.get("titles") or [])
+        for t in list(streak):
+            if t not in titles:
+                del streak[t]
+        for t in titles:
+            streak[t] = streak.get(t, 0) + 1
+    return [t for t, n in streak.items() if n >= threshold]
+
+
+def compute_constraints(
+    summary: dict, profile: dict, events: list[dict], week_start: date,
+    recent_items: list[dict] | None = None, history_plans: list[dict] | None = None,
+) -> dict:
+    """规则算约束:强度档 + 目标周轻量日 + 规避项 + 可用训练日 + 恢复日/换项(完整调档表)。"""
     checkin = summary.get("checkin") or {}
     rate = checkin.get("completion_rate")
     feel = summary.get("feeling") or {}
@@ -42,6 +58,26 @@ def compute_constraints(summary: dict, profile: dict, events: list[dict], week_s
     else:
         level = "keep"
         reasons.append("完成率与体感处于中间区,保持当前强度")
+
+    # 连续低体感(≤2)≥2 次 → 建议恢复日
+    low_streak, cur = 0, 0
+    scored = sorted(
+        [it for it in (recent_items or []) if it.get("feeling_score") is not None and it.get("date")],
+        key=lambda x: str(x.get("date")),
+    )
+    for it in scored:
+        if int(it["feeling_score"]) <= 2:
+            cur += 1
+            low_streak = max(low_streak, cur)
+        else:
+            cur = 0
+    recovery_days = 1 if low_streak >= 2 else 0
+    if recovery_days:
+        reasons.append(f"连续 {low_streak} 次体感偏低,本周插入恢复日")
+
+    repeated = _repeat_titles(history_plans or [], threshold=4)
+    if repeated:
+        reasons.append("重复训练建议换项:" + "、".join(repeated))
 
     week_end = week_start + timedelta(days=6)
     light_dates: dict[str, str] = {}
@@ -87,6 +123,14 @@ def compute_constraints(summary: dict, profile: dict, events: list[dict], week_s
         "light_dates": light_dates,
         "avoid": avoids,
         "events": event_notes,
+        "recovery_days": recovery_days,
+        "swap_suggestions": [f"「{t}」已连续 4 周以上,建议换一个同类动作" for t in repeated],
+        "evidence": {
+            "completion_rate": rate,
+            "tired_ratio": round(tired_ratio, 2),
+            "low_feeling_streak": low_streak,
+            "events": event_notes,
+        },
     }
 
 

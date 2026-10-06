@@ -51,7 +51,7 @@ async def main() -> int:
     tools = await list_mcp_tools(BASE)
     names = sorted(t["name"] for t in tools)
     print(f"tools({len(names)}): {names}")
-    check(len(names) == 15, "工具数 = 15")
+    check(len(names) == 16, "工具数 = 16")
     for required in ("upsert_health_record", "get_range_summary", "save_plan", "upsert_checkin",
                      "search_food", "add_meal", "update_profile", "list_active_events"):
         check(required in names, f"工具存在:{required}")

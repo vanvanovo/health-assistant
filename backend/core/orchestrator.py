@@ -1,12 +1,10 @@
 # backend/core/orchestrator.py
-# 会话编排:规则前置 → 意图路由 → 多意图串行分发 → 卡片 + 打字机消息。
-# 对外只暴露 run_chat(异步事件流):routing / progress / card / token / meta / done。
-# V1 说明:token 事件按固定步长切片推送(前端已是 SSE 打字机);真·逐 token 流式为后续增强项。
+# 会话编排辅助层:规则前置 / 意图分发 / 打卡处理 / 消息切片(供 assistant 主图调用)。
+# 事件流主链路见 backend/core/assistant.py(routing / progress / card / token / meta / done)。
 
 from __future__ import annotations
 
 import asyncio
-import time
 from datetime import date, timedelta
 
 from backend.agents.analyst.graph import run_analyst
@@ -14,6 +12,7 @@ from backend.agents.common import tools
 from backend.agents.common.result import agent_result
 from backend.agents.common.utils import short_hash
 from backend.agents.diet.graph import run_diet
+from backend.agents.memory.handler import run_memory
 from backend.agents.planner.graph import run_planner
 from backend.agents.recorder.graph import run_recorder
 from backend.core.logger import get_logger
@@ -23,7 +22,7 @@ logger = get_logger(__name__)
 
 INTENT_LABELS = {
     "record": "记录", "checkin": "打卡", "analyze": "数据分析", "plan": "计划",
-    "diet": "饮食", "knowledge": "知识问答", "out_of_scope": "其他",
+    "diet": "饮食", "memory": "记忆", "knowledge": "知识问答", "out_of_scope": "其他",
 }
 STATUS_CN = {"done": "完成", "partial": "部分完成", "missed": "未完成"}
 STREAM_CHUNK = 14
@@ -124,74 +123,8 @@ async def _dispatch(name: str, query: str, slots: dict) -> dict:
         return await run_planner(query, today=today)
     if name == "diet":
         return await run_diet(query, today=today)
+    if name == "memory":
+        return await run_memory(query, today=today)
     if name == "knowledge":
         return agent_result("knowledge", "ok", "健康知识问答会在 V3 上线,先帮你记下需求~")
     return agent_result("router", "ok", OUT_OF_SCOPE_REPLY)
-
-
-async def run_chat(user_input: str):
-    """会话主链路(异步事件流)。"""
-    t0 = time.time()
-
-    # ① 规则前置(零 Token)
-    pf = prefilter(user_input)
-    if pf:
-        yield {"event": "routing", "data": {"intents": ["rule"], "slots": {}, "confidence": 1.0}}
-        async for ev in _stream_message(pf["message"]):
-            yield ev
-        yield {"event": "meta", "data": {"elapsed_ms": int((time.time() - t0) * 1000), "degraded": False, "sources": []}}
-        yield {"event": "done", "data": {}}
-        return
-
-    # ② 意图识别
-    yield {"event": "progress", "data": {"stage": "routing", "label": "正在识别意图…"}}
-    try:
-        routed = await route_intent(user_input)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("router.failed", error=str(e))
-        yield {"event": "routing", "data": {"intents": ["out_of_scope"], "slots": {}, "confidence": 0.0}}
-        async for ev in _stream_message(FALLBACK_REPLY):
-            yield ev
-        yield {"event": "meta", "data": {"elapsed_ms": int((time.time() - t0) * 1000), "degraded": True, "sources": []}}
-        yield {"event": "done", "data": {}}
-        return
-
-    yield {
-        "event": "routing",
-        "data": {
-            "intents": [i["name"] for i in routed["intents"]],
-            "slots": routed["slots"],
-            "confidence": routed["confidence"],
-        },
-    }
-
-    # ③ 追问(信息不足)
-    if routed["need_clarify"]:
-        clarify = routed["clarify"] or "能再多说一点吗?比如时间、项目或具体数字。"
-        async for ev in _stream_message(clarify):
-            yield ev
-        yield {"event": "meta", "data": {"elapsed_ms": int((time.time() - t0) * 1000), "degraded": False, "sources": []}}
-        yield {"event": "done", "data": {}}
-        return
-
-    # ④ 多意图串行分发(V1 串行;无依赖场景可并行,后续增强)
-    results: list[dict] = []
-    for it in routed["intents"]:
-        name, query = it["name"], it["query"]
-        yield {"event": "progress", "data": {"stage": name, "label": f"正在处理:{INTENT_LABELS.get(name, name)}…"}}
-        try:
-            result = await _dispatch(name, query, routed["slots"])
-        except Exception as e:  # noqa: BLE001
-            logger.error("dispatch.failed", intent=name, error=str(e))
-            result = agent_result(name, "failed", "这项暂时处理不了,稍后再试或换个说法。", degraded=True)
-        results.append(result)
-        if result.get("card"):
-            yield {"event": "card", "data": result["card"]}
-
-    # ⑤ 汇总输出
-    combined = "\n\n".join(r.get("message") or "" for r in results if r.get("message"))
-    async for ev in _stream_message(combined):
-        yield ev
-    degraded = any(r.get("degraded") for r in results)
-    yield {"event": "meta", "data": {"elapsed_ms": int((time.time() - t0) * 1000), "degraded": degraded, "sources": []}}
-    yield {"event": "done", "data": {}}

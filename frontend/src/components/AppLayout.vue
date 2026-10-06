@@ -20,6 +20,7 @@ function logout() {
         <el-menu-item index="/chat"><el-icon><ChatDotRound /></el-icon>对话</el-menu-item>
         <el-menu-item index="/dashboard"><el-icon><TrendCharts /></el-icon>数据看板</el-menu-item>
         <el-menu-item index="/checkin"><el-icon><Calendar /></el-icon>计划打卡</el-menu-item>
+        <el-menu-item index="/profile"><el-icon><User /></el-icon>我的画像</el-menu-item>
       </el-menu>
       <div class="user">
         <span>{{ auth.username || '未登录' }}</span>

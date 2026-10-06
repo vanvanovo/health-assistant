@@ -89,3 +89,25 @@ async def test_route_intent_empty_intents(monkeypatch):
     assert r["intents"][0]["name"] == "out_of_scope"
     assert r["need_clarify"] is True
     assert r["clarify"] == "想做什么?"
+
+
+@pytest.mark.asyncio
+async def test_route_intent_includes_history(monkeypatch):
+    captured = {}
+
+    async def fake(messages, **kw):
+        captured["messages"] = messages
+        return {"intents": ["analyze"], "slots": {"days": 7}, "confidence": 0.9}
+
+    monkeypatch.setattr(llm_json, "chat_json", fake)
+
+    class _Msg:
+        def __init__(self, mtype, content):
+            self.type, self.content = mtype, content
+
+    history = [_Msg("human", "我最近一个月状态怎么样?"), _Msg("ai", "近30天训练12次")]
+    r = await intent_router.route_intent("那这周呢?", today=TODAY, history=history)
+    system_content = captured["messages"][0]["content"]
+    assert "近期对话" in system_content
+    assert "我最近一个月状态怎么样?" in system_content
+    assert r["slots"]["days"] == 7

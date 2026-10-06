@@ -1,5 +1,5 @@
 # backend/core/router.py
-# 意图路由:规则前置(零 Token)→ LLM 意图 JSON(可多意图 + 槽位 + 追问)。
+# 意图路由:规则前置(零 Token)→ LLM 意图 JSON(可多意图 + 槽位 + 追问 + 近期对话上下文)。
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import date
 
 from backend.agents.common import llm_json
 
-INTENTS = {"record", "checkin", "analyze", "plan", "diet", "knowledge", "out_of_scope"}
+INTENTS = {"record", "checkin", "analyze", "plan", "diet", "memory", "knowledge", "out_of_scope"}
 
 GREETINGS = ("你好", "您好", "hi", "hello", "嗨", "在吗", "早上好", "中午好", "晚上好", "早安", "晚安")
 THANKS = ("谢谢", "感谢", "多谢", "thanks", "thx", "辛苦了")
@@ -27,10 +27,12 @@ SYSTEM_TEMPLATE = """你是个人健康助手的意图识别模块。今天是 _
 
 可选意图(严格使用这些名字):
 - record: 记录健康数据(跑步/力量训练、体重、睡眠、体感)
-- checkin: 对计划项打卡("今天训练完成了/没做/做了一半")
+- checkin: 对计划项打卡(仅完成状态:"今天训练完成了/没做/做了一半")
 - analyze: 查看统计/趋势/状态("最近一个月怎么样""这周睡眠如何")
 - plan: 生成或调整训练计划("帮我排下周计划")
-- diet: 饮食记录与推荐(该能力即将上线)
+- diet: 饮食记录与推荐("午饭吃了200g鸡胸肉""帮我配明天的三餐""晚上饿了吃什么好")
+- memory: 更新长期画像/偏好/禁忌,设置提醒,或记录伤病/出差/体检等事件
+  ("我膝盖不好""下周一到周三出差""记住:提醒我每天 21 点打卡""目标是增肌")
 - knowledge: 健康知识问答(该能力即将上线)
 - out_of_scope: 与个人健康管理无关
 
@@ -44,10 +46,13 @@ SYSTEM_TEMPLATE = """你是个人健康助手的意图识别模块。今天是 _
 1. 一句话含多个诉求 → 输出多个 intent,保持原文顺序;但不要过度拆分:同一个诉求只用一个 intent。
 2. record 与 checkin 的区分:描述"今天做了什么/身体状态如何"(含体感、睡眠、体重)→ record;
    只有针对计划项表达"做了/没做/做了一半"(如"训练完成了""鸽了")→ checkin;"今天休息"属于 record(记录休息日)。
-3. 消息里顺带提到的体感/状态(如"有点累""状态不错")如果是打卡或计划请求的附带说明,
+   长期偏好/禁忌/未来的事件陈述(如"以后别排深蹲跳""下周一到周三出差")→ memory,不是 record。
+3. 计划/打卡请求里顺带提到的日程或状态(如"排计划,周三要出差""完成了,有点累")是请求的附带说明,
+   不额外输出 memory/record;只有独立的日程陈述("下周一到周三出差")才用 memory。
+4. 消息里顺带提到的体感/状态(如"有点累""状态不错")如果是打卡或计划请求的附带说明,
    不要额外输出 record——只有用户明确在告知当天健康数据时才用 record。
-4. 只有完全无法处理时才 need_clarify=true。
-5. slots 没有就给空对象 {}。"""
+5. 只有完全无法处理时才 need_clarify=true。
+6. slots 没有就给空对象 {}。"""
 
 
 def build_system(today: str) -> str:
@@ -93,11 +98,33 @@ def _clean_slots(raw) -> dict:
     return slots
 
 
-async def route_intent(user_input: str, today: str | None = None) -> dict:
-    """LLM 意图识别;输出经归一与白名单清洗。"""
+def _format_history(history, limit: int = 6, width: int = 100) -> str:
+    """把近期消息格式化为上下文文本(支持 LangChain 消息对象或 dict)。"""
+    lines: list[str] = []
+    for m in (history or [])[-limit:]:
+        role_raw = getattr(m, "type", None) or (m.get("role") if isinstance(m, dict) else "") or ""
+        content = getattr(m, "content", None)
+        if content is None and isinstance(m, dict):
+            content = m.get("content")
+        if isinstance(content, list):
+            content = " ".join(str(c) for c in content)
+        role = "用户" if str(role_raw) in ("human", "user") else "助手"
+        text = str(content or "").strip().replace("\n", " ")
+        if text:
+            lines.append(f"{role}: {text[:width]}")
+    return "\n".join(lines)
+
+
+async def route_intent(user_input: str, today: str | None = None, history=None) -> dict:
+    """LLM 意图识别(可带近期对话,用于理解指代);输出经归一与白名单清洗。"""
+    system = build_system(today or date.today().isoformat())
+    ctx = _format_history(history)
+    if ctx:
+        system += "\n\n近期对话(用于理解指代;不要重复回答历史内容):\n" + ctx
+
     data = await llm_json.chat_json(
         [
-            {"role": "system", "content": build_system(today or date.today().isoformat())},
+            {"role": "system", "content": system},
             {"role": "user", "content": user_input},
         ],
         temperature=0,

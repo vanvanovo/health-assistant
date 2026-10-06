@@ -34,7 +34,11 @@ async def run(limit: int | None) -> int:
     failures = []
 
     for i, row in enumerate(rows, 1):
-        text, expected = row["text"], sorted(set(row["expected"]))
+        text = row["text"]
+        expected = sorted(set(row["expected"]))
+        # 等价口径:边界 phrasing 允许多种合理输出(如"出差"是否单独记事件)
+        alternatives = [sorted(set(a)) for a in (row.get("expected_any") or [])]
+        accepted = {tuple(expected)} | {tuple(a) for a in alternatives}
         try:
             routed = await route_intent(text)
             actual = sorted({it["name"] for it in routed["intents"]})
@@ -43,7 +47,7 @@ async def run(limit: int | None) -> int:
         total += 1
         label = "multi" if len(expected) > 1 else expected[0]
         by_label_total[label] += 1
-        if actual == expected:
+        if tuple(actual) in accepted:
             exact += 1
             by_label_hit[label] += 1
         else:

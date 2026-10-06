@@ -27,12 +27,14 @@ SYSTEM_TEMPLATE = """你是个人健康助手的「周计划生成」模块。�
 2. 强度档:__LEVEL_HINT__
 3. 目标周从 __WEEK_START__ 开始,共 7 天:__WEEK_DATES__。
 4. 训练(workout)从这些天里选(0=周一):__WORKOUT_DAYS__;每周 workout 3~4 次,每天最多 1 个 workout 项。
-5. __LIGHT_NOTE__
-6. __AVOID_NOTE__
-7. 除了训练,可加 2~3 个 habit(习惯)项与至多 2 条 diet(饮食)提示项。
-8. intensity 取 1(轻)/2(中)/3(高);强度档为 down 时,workout 的 intensity 不得为 3。
-9. rationale 必须引用给定统计(完成率/体感/事件等)说明为什么这样排,1~2 句。
-10. 只输出严格 JSON,不要解释、不要代码块标记。
+5. __RECOVERY_NOTE__
+6. __LIGHT_NOTE__
+7. __AVOID_NOTE__
+8. __SWAP_NOTE__
+9. 除了训练,可加 2~3 个 habit(习惯)项与至多 2 条 diet(饮食)提示项。
+10. intensity 取 1(轻)/2(中)/3(高);强度档为 down 时,workout 的 intensity 不得为 3。
+11. rationale 必须引用给定统计(完成率/体感/事件等)说明为什么这样排,1~2 句。
+12. 只输出严格 JSON,不要解释、不要代码块标记。
 
 输出格式:
 {"summary": "一句话概要", "rationale": "调档依据", "items": [
@@ -57,11 +59,20 @@ def build_system(
     avoid = constraints.get("avoid") or []
     avoid_note = "规避项:" + "、".join(avoid) if avoid else "无伤病规避项"
 
+    recovery = int(constraints.get("recovery_days") or 0)
+    recovery_note = (
+        f"本周至少安排 {recovery} 天恢复日(瑜伽拉伸/散步,强度 1),优先放在低体感后的次日"
+        if recovery else "无强制恢复日要求"
+    )
+    swaps = constraints.get("swap_suggestions") or []
+    swap_note = ("换项建议(请用候选动作替换):" + "、".join(swaps)) if swaps else "无换项建议"
+
     facts = {
         "近30天统计": summary,
         "画像": profile,
         "有效事件": events,
         "调档依据": constraints.get("reasons"),
+        "证据": constraints.get("evidence"),
     }
     return (
         SYSTEM_TEMPLATE
@@ -69,8 +80,10 @@ def build_system(
         .replace("__WEEK_START__", week_start.isoformat())
         .replace("__WEEK_DATES__", week_dates)
         .replace("__WORKOUT_DAYS__", str(constraints.get("workout_days")))
+        .replace("__RECOVERY_NOTE__", recovery_note)
         .replace("__LIGHT_NOTE__", light_note)
         .replace("__AVOID_NOTE__", avoid_note)
+        .replace("__SWAP_NOTE__", swap_note)
         .replace("__CANDIDATES__", "、".join(CANDIDATES))
         + "\n\n给定数据:\n" + json.dumps(facts, ensure_ascii=False, default=str)
     )

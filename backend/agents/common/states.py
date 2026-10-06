@@ -42,6 +42,8 @@ class PlannerState(TypedDict, total=False):
     profile: dict            # 画像
     events: list[dict]       # 有效事件记忆
     constraints: dict        # 规则约束(强度档/轻量日/规避项)
+    recent_items: list[dict]  # 本周已执行项(含体感,用于连续低体感判断)
+    history_plans: list[dict] # 近 4 周计划概要(用于换项判断)
     llm_plan: dict           # LLM 生成的计划 JSON(已本地校验)
     saved: dict              # MCP 保存结果
     result: dict

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.v1 import api_router
 from backend.config import get_settings
+from backend.core.assistant import init_assistant, saver_kind, shutdown_assistant
 from backend.core.llm import load_providers
 from backend.core.logger import configure_logging, get_logger
 from backend.mcp.auth import ApiKeyAuthMiddleware
@@ -33,9 +34,12 @@ async def lifespan(app: FastAPI):
         pg=f"{s.pg_host}:{s.pg_port}/{s.pg_db}",
         mcp_auth=bool(s.mcp_shared_key),
     )
+    memory_kind = await init_assistant()
+    log.info("app.memory_ready", kind=memory_kind)
     async with _health_mcp_app.router.lifespan_context(_health_mcp_app):
         log.info("app.started")
         yield
+    await shutdown_assistant()
     log.info("app.stop")
 
 
@@ -71,6 +75,7 @@ async def health():
         "service": "health-assistant",
         "version": APP_VERSION,
         "llm_providers": [p.name for p in load_providers()],
+        "memory": saver_kind(),
     }
 
 

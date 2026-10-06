@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { applyMemory } from '@/api'
 
 const props = defineProps<{ card: any }>()
 
@@ -15,6 +17,34 @@ const mealRows = computed(() => {
   }
   return rows
 })
+
+function pretty(v: any): string {
+  if (Array.isArray(v)) return v.join('、')
+  if (v && typeof v === 'object') return JSON.stringify(v, null, 0)
+  return String(v ?? '-')
+}
+
+function pct(v: any): string {
+  const n = Number(v)
+  return Number.isFinite(n) ? `${Math.round(n * 100)}%` : '-'
+}
+
+const confirming = ref(false)
+
+async function confirmMemory() {
+  const token = props.card?.payload?.token
+  if (!token || confirming.value) return
+  confirming.value = true
+  try {
+    const res = await applyMemory(token)
+    props.card.payload.status = 'applied'
+    ElMessage.success(res?.kind === 'event' ? '事件已写入' : '画像已更新')
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    confirming.value = false
+  }
+}
 </script>
 
 <template>
@@ -70,6 +100,11 @@ const mealRows = computed(() => {
         <el-table-column prop="est_minutes" label="分钟" width="70" />
         <el-table-column prop="intensity" label="强度" width="70" />
       </el-table>
+      <div class="diet-note" v-if="card.payload?.evidence">
+        调档依据:完成率 {{ pct(card.payload.evidence.completion_rate) }} · 疲惫占比 {{ pct(card.payload.evidence.tired_ratio) }}<span
+          v-if="card.payload.evidence.low_feeling_streak"> · 连续低体感 {{ card.payload.evidence.low_feeling_streak }} 次</span><span
+          v-if="card.payload.evidence.events?.length"> · 事件:{{ card.payload.evidence.events.join(';') }}</span>
+      </div>
     </template>
 
     <template v-else-if="card.type === 'diet'">
@@ -106,6 +141,30 @@ const mealRows = computed(() => {
       <div class="diet-note" v-if="card.payload?.note">{{ card.payload.note }}</div>
     </template>
 
+    <template v-else-if="card.type === 'profile_update'">
+      <el-alert :closable="false"
+        :type="card.payload?.status === 'applied' ? 'success' : card.payload?.status === 'ignored' ? 'info' : 'warning'"
+        :title="card.payload?.status === 'applied' ? '✅ 记忆已写入'
+          : card.payload?.status === 'ignored' ? '已忽略(未写入)'
+          : '🧠 记忆待确认 — 点「确认写入」才会保存'" />
+      <el-descriptions v-if="card.payload?.patch" :column="2" size="small" border style="margin-top: 6px">
+        <el-descriptions-item v-for="(v, k) in card.payload.patch" :key="k" :label="String(k)">
+          {{ pretty(v) }}
+        </el-descriptions-item>
+      </el-descriptions>
+      <el-descriptions v-else-if="card.payload?.event" :column="2" size="small" border style="margin-top: 6px">
+        <el-descriptions-item label="类型">{{ card.payload.event.kind }}</el-descriptions-item>
+        <el-descriptions-item label="描述">{{ card.payload.event.description }}</el-descriptions-item>
+        <el-descriptions-item label="开始">{{ card.payload.event.start_date }}</el-descriptions-item>
+        <el-descriptions-item label="结束">{{ card.payload.event.end_date || '长期' }}</el-descriptions-item>
+      </el-descriptions>
+      <div v-if="card.payload?.status === 'pending'" class="confirm-row">
+        <el-button type="primary" size="small" :loading="confirming" @click="confirmMemory">确认写入</el-button>
+        <el-button size="small" @click="card.payload.status = 'ignored'">忽略</el-button>
+      </div>
+      <div v-else-if="card.payload?.summary" class="diet-note">{{ card.payload.summary }}</div>
+    </template>
+
     <pre v-else class="raw">{{ JSON.stringify(card, null, 2) }}</pre>
   </div>
 </template>
@@ -116,5 +175,6 @@ const mealRows = computed(() => {
 .anomalies { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
 .diet-total { margin-top: 6px; color: #606266; font-size: 13px; }
 .diet-note { margin-top: 4px; color: #999; font-size: 12px; }
+.confirm-row { margin-top: 8px; display: flex; gap: 8px; }
 .raw { background: #fafafa; padding: 8px; font-size: 12px; max-height: 200px; overflow: auto; }
 </style>

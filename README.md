@@ -5,7 +5,7 @@
 ## 进度
 
 - **V1 核心闭环 MVP ✅ 完成(2026-10-06,P0–P4)**:14 表数据底座(pgvector)/ MCP 四域 15 工具 / 记录·分析·计划三张 LangGraph 图 / 编排 + SSE / Vue3 工作台初版 / 意图评测 60/60
-- V2 实施计划已出(**进行中**):P5 饮食 Agent ✅(记录估算 + 食谱推荐)→ P6 画像与长期记忆 → P7 可视化深化
+- V2 实施计划已出(**进行中**):P5 饮食 Agent ✅ → P6 画像与长期记忆 ✅(主图挂 PostgresSaver,多轮指代 + 确认卡)→ P7 可视化深化
 
 ## 快速开始(本机)
 
@@ -19,8 +19,8 @@ docker compose up -d postgres
 & $py scripts\init_db.py
 & $py scripts\gen_demo_data.py
 
-# 3) 网关(:8020)
-& $py -m uvicorn backend.main:app --host 0.0.0.0 --port 8020
+# 3) 网关(:8020;run_server.py 会在 Windows 上先切 Selector 事件循环,psycopg 需要)
+& $py run_server.py
 
 # 4) 前端(:3020,演示账号 health-demo / health-demo)
 cd frontend; npm install; npm run dev

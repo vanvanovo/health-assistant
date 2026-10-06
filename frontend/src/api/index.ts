@@ -24,3 +24,28 @@ export async function postCheckin(payload: Record<string, unknown>) {
   const { data } = await client.post('/checkins', payload)
   return data
 }
+
+export async function fetchProfile() {
+  const { data } = await client.get('/profile')
+  return data
+}
+
+export async function updateProfile(patch: Record<string, unknown>) {
+  const { data } = await client.put('/profile', { patch })
+  return data
+}
+
+export async function fetchEvents(date?: string) {
+  const { data } = await client.get('/memory/events', { params: { date } })
+  return data as { events?: any[]; count?: number }
+}
+
+export async function addMemoryEvent(payload: Record<string, unknown>) {
+  const { data } = await client.post('/memory/events', payload)
+  return data
+}
+
+export async function applyMemory(token: string) {
+  const { data } = await client.post('/memory/apply', { token })
+  return data as { status: string; kind?: string; summary?: string }
+}

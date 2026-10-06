@@ -147,3 +147,38 @@ def test_validate_plan_items_boundaries():
         validate_plan_items([], ws)
     with pytest.raises(ValueError):
         validate_plan_items([{"date": "2026-10-12", "kind": "workout", "title": "x", "intensity": 9}], ws)
+
+
+def test_recovery_days_on_consecutive_low_feelings():
+    recent = [
+        {"date": "2026-10-03", "status": "done", "feeling_score": 2},
+        {"date": "2026-10-04", "status": "done", "feeling_score": 2},
+        {"date": "2026-10-05", "status": "partial", "feeling_score": 4},
+    ]
+    c = compute_constraints(SUMMARY_UP, PROFILE, [], date(2026, 10, 12), recent_items=recent, history_plans=[])
+    assert c["recovery_days"] == 1
+    assert any("恢复日" in r for r in c["reasons"])
+    assert c["evidence"]["low_feeling_streak"] == 2
+
+
+def test_swap_suggestion_after_four_weeks():
+    history = [
+        {"week_start": "2026-10-12", "titles": ["慢跑 5km 轻松跑"]},
+        {"week_start": "2026-10-05", "titles": ["慢跑 5km 轻松跑", "核心 + 拉伸"]},
+        {"week_start": "2026-09-28", "titles": ["慢跑 5km 轻松跑"]},
+        {"week_start": "2026-09-21", "titles": ["慢跑 5km 轻松跑", "力量:上肢推拉"]},
+    ]
+    c = compute_constraints(SUMMARY_UP, PROFILE, [], date(2026, 10, 12), history_plans=history)
+    assert any("慢跑 5km 轻松跑" in s for s in c["swap_suggestions"])
+    assert any("换项" in r for r in c["reasons"])
+
+
+def test_no_swap_when_streak_broken():
+    history = [
+        {"week_start": "2026-10-12", "titles": ["慢跑 5km 轻松跑"]},
+        {"week_start": "2026-10-05", "titles": ["慢跑 5km 轻松跑"]},
+        {"week_start": "2026-09-28", "titles": ["游泳 45 分钟"]},
+        {"week_start": "2026-09-21", "titles": ["慢跑 5km 轻松跑"]},
+    ]
+    c = compute_constraints(SUMMARY_UP, PROFILE, [], date(2026, 10, 12), history_plans=history)
+    assert c["swap_suggestions"] == []

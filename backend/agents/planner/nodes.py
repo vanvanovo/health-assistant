@@ -26,12 +26,17 @@ async def context_node(state) -> dict:
     profile = tools.tool_data(await tools.call_tool("get_profile", {}), {})
     events_res = await tools.call_tool("list_active_events", {"date": today.isoformat()})
     events = tools.tool_data(events_res, {}).get("events", []) if isinstance(tools.tool_data(events_res, {}), dict) else []
+    history_plans = (tools.tool_data(await tools.call_tool("list_plans", {"weeks": 4}), {}) or {}).get("plans") or []
+    cur_plan = tools.tool_data(await tools.call_tool("get_active_plan", {"date": today.isoformat()}), {}) or {}
+    recent_items = cur_plan.get("items") or []
 
     return {
         "week_start": week_start.isoformat(),
         "summary": summary or {},
         "profile": profile or {},
         "events": events or [],
+        "history_plans": history_plans,
+        "recent_items": recent_items,
     }
 
 
@@ -41,6 +46,8 @@ async def adjust_node(state) -> dict:
         state.get("profile") or {},
         state.get("events") or [],
         date.fromisoformat(state["week_start"]),
+        recent_items=state.get("recent_items") or [],
+        history_plans=state.get("history_plans") or [],
     )
     return {"constraints": constraints}
 
@@ -112,6 +119,7 @@ async def format_node(state) -> dict:
             "summary": plan.get("summary", ""),
             "rationale": plan.get("rationale", ""),
             "level": state["constraints"]["level"],
+            "evidence": state["constraints"].get("evidence"),
             "items": plan.get("items", []),
         },
     }

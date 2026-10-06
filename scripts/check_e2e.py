@@ -93,6 +93,8 @@ async def main() -> int:
         token = r.json().get("access_token") if r.status_code == 200 else None
         check(bool(token), "登录成功拿到 token")
         H = {"Authorization": f"Bearer {token}"}
+        h = await client.get(f"{BASE}/health")
+        check(h.json().get("memory") in ("postgres", "memory"), f"记忆层就绪({h.json().get('memory')})")
 
         # 2) 场景 1:一句话记录
         evs = await sse(client, token, "今天慢跑 30 分钟,体重 68.1,睡了 7 小时,感觉不错")
@@ -114,7 +116,8 @@ async def main() -> int:
 
         # 5) 场景 4:计划
         evs = await sse(client, token, "下周给我排训练计划,周三要出差")
-        check([e["data"]["intents"] for e in has(evs, "routing")] == [["plan"]], "场景4 routing=plan")
+        routed4 = [e["data"]["intents"] for e in has(evs, "routing")]
+        check(bool(routed4) and "plan" in routed4[0], f"场景4 routing 含 plan({routed4[0] if routed4 else None})")
         check(any(c["data"]["type"] == "plan" for c in has(evs, "card")), "场景4 计划卡")
 
         # 6) 场景 5:打卡
@@ -133,6 +136,12 @@ async def main() -> int:
             if c["data"]["type"] == "diet" and c["data"]["payload"].get("mode") == "recommend"
         ]
         check(bool(reco_cards), "场景7 食谱卡(recommend)")
+
+        # 6.8) 场景 8:长期记忆(返回待确认卡,不直接落库)
+        evs = await sse(client, token, "我膝盖不好,以后别给我排深蹲跳")
+        check([e["data"]["intents"] for e in has(evs, "routing")] == [["memory"]], "场景8 routing=memory")
+        pcards = [c for c in has(evs, "card") if c["data"]["type"] == "profile_update"]
+        check(bool(pcards) and pcards[0]["data"]["payload"].get("token"), "场景8 记忆待确认卡")
 
         # 7) 看板 REST
         r = await client.get(f"{BASE}/api/v1/dashboard/overview", headers=H)

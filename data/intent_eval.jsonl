@@ -35,7 +35,7 @@
 {"text": "体重最近降了吗", "expected": ["analyze"]}
 {"text": "下周给我排训练计划", "expected": ["plan"]}
 {"text": "帮我安排下周的训练", "expected": ["plan"]}
-{"text": "下周要出差三天,帮我调整下计划", "expected": ["plan"]}
+{"text": "下周要出差三天,帮我调整下计划", "expected": ["plan"], "expected_any": [["plan", "memory"], ["memory", "plan"]]}
 {"text": "给我生成一份下周的健身计划", "expected": ["plan"]}
 {"text": "下周想多练点上肢", "expected": ["plan"]}
 {"text": "帮我排一个训练计划,周三周四没时间", "expected": ["plan"]}
@@ -57,4 +57,21 @@
 {"text": "体重68.2,睡了7小时,最近状态怎么样", "expected": ["record", "analyze"]}
 {"text": "帮我记一下今天的力量训练,另外看看最近一个月的趋势", "expected": ["record", "analyze"]}
 {"text": "打卡完成,顺便看下这周完成率", "expected": ["checkin", "analyze"]}
-{"text": "下周要出差,帮我调整计划,并看看最近的睡眠", "expected": ["plan", "analyze"]}
+{"text": "下周要出差,帮我调整计划,并看看最近的睡眠", "expected": ["plan", "analyze"], "expected_any": [["plan", "analyze", "memory"]]}
+{"text": "我膝盖不好,以后别给我排深蹲跳", "expected": ["memory"]}
+{"text": "我在家有哑铃和瑜伽垫", "expected": ["memory"]}
+{"text": "我乳糖不耐受,别推荐牛奶", "expected": ["memory"]}
+{"text": "下周一到周三出差", "expected": ["memory"]}
+{"text": "上周脚崴了", "expected": ["memory"]}
+{"text": "上周五做了个体检", "expected": ["memory"]}
+{"text": "我的目标是增肌", "expected": ["memory"]}
+{"text": "提醒我每天晚上9点打卡", "expected": ["memory"]}
+{"text": "午饭吃了200g鸡胸肉和一碗米饭", "expected": ["diet"]}
+{"text": "早餐吃了两个鸡蛋和一杯牛奶", "expected": ["diet"]}
+{"text": "晚饭吃了三文鱼和西兰花", "expected": ["diet"]}
+{"text": "帮我配明天的三餐", "expected": ["diet"]}
+{"text": "减脂期晚上饿了吃什么好", "expected": ["diet"]}
+{"text": "来一份高蛋白的食谱", "expected": ["diet"]}
+{"text": "记录一下:下午喝了杯酸奶", "expected": ["diet"]}
+{"text": "明天想吃得清淡点,帮我安排", "expected": ["diet"]}
+{"text": "我膝盖不好,顺便帮我排下周计划", "expected": ["memory", "plan"]}
