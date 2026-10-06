@@ -44,6 +44,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       RAG_AGENT_URL: ${RAG_AGENT_URL:-http://host.docker.internal:5021}
       SEED_DEMO: ${SEED_DEMO:-true}
+      TZ: Asia/Shanghai
     ports:
       - "8020:8020"
     depends_on:

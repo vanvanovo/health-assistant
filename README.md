@@ -58,6 +58,23 @@ Start-Process $py -ArgumentList "services\rag_agent\server.py"   # A2A :5021(独
 cd frontend; npm install; npm run dev
 ```
 
+## 云端轻量部署(可选;2 核 1.7G 内存)
+
+> 公网入口 `http://<服务器IP>:8080`(需在云控制台安全组放行 **8080**)。
+> 云端用独立编排文件 `docker-compose.cloud.yml`:PostgreSQL / Redis / 网关**不发布任何宿主机端口**(仅容器内网互通),
+> RAG 不部署(`RAG_VIA_A2A=false`,知识问答走降级话术并明确标注);网关 `TZ=Asia/Shanghai`。
+
+```bash
+# 服务器(Ubuntu 24.04;需先 apt 安装 docker.io + docker-compose-v2)
+cd /opt/health-assistant
+docker compose -f docker-compose.cloud.yml up -d          # 首次构建加 --build
+```
+
+说明:
+
+- `SEED_DEMO=true`(默认)容器重建时重灌演示数据(演示友好);要保留数据改为 `false` 后重建。
+- 公网冒烟:`HEALTH_BASE_URL=http://<服务器IP>:8080 python scripts/check_cloud.py`(14 项断言:鉴权/登录/规则/知识降级/高危拦截/记录/看板)。
+
 ## 验收脚本(可复现)
 
 | 脚本 | 对象 |

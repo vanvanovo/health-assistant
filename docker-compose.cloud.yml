@@ -1,0 +1,67 @@
+# docker-compose.cloud.yml — 云端独立部署(2 核 1.7G 内存)
+#
+# 用法(服务器仓库根目录):
+#   docker compose -f docker-compose.cloud.yml up -d
+#
+# 与本地 docker-compose.yml 的区别:
+#   - PostgreSQL / Redis / 网关 不发布任何宿主机端口(仅 compose 内网互通,更安全,也避免端口绑定冲突)
+#   - 公网仅暴露前端 Nginx:8080(需在云控制台安全组放行)
+#   - RAG 不部署:RAG_VIA_A2A=false,知识问答走已实测的降级话术
+#   - SEED_DEMO=true:网关容器重建时重灌演示数据(演示友好;要保留数据改为 "false")
+name: health-cloud
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: health-postgres
+    environment:
+      POSTGRES_USER: ${PG_USER:-health}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD 未配置}
+      POSTGRES_DB: ${PG_DB:-health_assistant}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-health} -d ${PG_DB:-health_assistant}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    command: ["postgres", "-c", "shared_buffers=96MB", "-c", "max_connections=40", "-c", "work_mem=4MB"]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: health-redis
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    image: health-assistant-backend
+    container_name: health-gateway
+    env_file: .env
+    environment:
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+      RAG_VIA_A2A: "false"
+      SEED_DEMO: "true"
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    image: health-assistant-frontend
+    container_name: health-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+volumes:
+  pgdata:
