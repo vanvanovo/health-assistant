@@ -1,5 +1,11 @@
-# 个人健康助手 · Docker Compose(P1:PostgreSQL + pgvector;Redis 为 V4 预留)
-# 变量从同目录 .env 读取(PG_* 等)
+# 个人健康助手 · Docker Compose
+# 一键起(本机全功能):docker compose up -d --build
+#   ├─ postgres(pgvector :5434)├─ gateway(:8020)├─ frontend(nginx :8080)
+#   └─ redis(:6381,profile v4,可单独 up;不启动则缓存/锁自动透明降级)
+# 可选 RAG 容器(镜像较大,含 CPU torch):
+#   docker compose --profile rag up -d --build rag
+#   并让网关指向它:RAG_AGENT_URL=http://rag:5021 docker compose up -d gateway
+# 默认 RAG 走宿主进程(host.docker.internal:5021)
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -23,7 +29,58 @@ services:
     container_name: health-redis
     ports:
       - "6381:6379"
-    profiles: ["v4"]   # V4 才启用:docker compose --profile v4 up -d redis
+    profiles: ["v4"]   # docker compose --profile v4 up -d redis
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    image: health-assistant-backend
+    container_name: health-gateway
+    env_file: .env
+    environment:
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+      RAG_AGENT_URL: ${RAG_AGENT_URL:-http://host.docker.internal:5021}
+      SEED_DEMO: ${SEED_DEMO:-true}
+    ports:
+      - "8020:8020"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: health-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - gateway
+
+  rag:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.rag
+    image: health-assistant-rag
+    container_name: health-rag
+    profiles: ["rag"]
+    env_file: .env
+    environment:
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      KB_EMBEDDING_MODEL_PATH: /models/bge-m3
+      RAG_AGENT_PORT: "5021"
+    ports:
+      - "5021:5021"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - "${KB_MODEL_DIR:-D:/work/NEWedurag/rag_qa/models/bge-m3}:/models/bge-m3:ro"
 
 volumes:
   pgdata:

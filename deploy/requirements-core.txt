@@ -1,0 +1,43 @@
+# 容器内核心依赖(gateway/前端后端通用;不含本地嵌入重依赖 FlagEmbedding/torch)
+# LangChain / LangGraph
+langchain==1.2.10
+langchain-core==1.2.16
+langchain-community==0.4.1
+langchain-text-splitters==1.1.1
+langgraph==1.0.9
+langgraph-prebuilt==1.0.8
+langchain-openai==1.1.10
+
+# 持久化(业务库 + pgvector;会话 checkpointer)
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+pgvector==0.5.0
+langgraph-checkpoint-postgres==3.1.2
+psycopg[binary]==3.3.6
+
+# Web
+fastapi==0.133.0
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+sse-starlette==2.1.3
+
+# 缓存 / 调度
+redis>=5
+apscheduler==3.11.3
+
+# 工具 / 安全
+httpx==0.28.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-dotenv==1.0.1
+tenacity==9.0.0
+numpy==1.26.4
+
+# 校验
+pydantic==2.11.4
+pydantic-settings==2.11.0
+
+# MCP / A2A
+mcp==1.26.0
+python-a2a==0.5.10

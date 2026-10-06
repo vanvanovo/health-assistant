@@ -1,0 +1,19 @@
+# deploy/Dockerfile.rag — 可选:RAG Agent 容器(含 CPU torch + FlagEmbedding,镜像较大)
+# 需挂载嵌入模型目录:compose 中 volumes: <本机模型路径>:/models/bge-m3:ro
+FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_DEFAULT_TIMEOUT=180
+
+COPY deploy/requirements-rag.txt ./requirements-rag.txt
+COPY deploy/requirements-core.txt ./requirements-core.txt
+RUN pip install --no-cache-dir -r requirements-rag.txt
+
+COPY backend ./backend
+COPY services ./services
+COPY scripts ./scripts
+
+EXPOSE 5021
+CMD ["python", "services/rag_agent/server.py"]

@@ -83,6 +83,20 @@ class HealthRagAgent(A2AServer):
         self._port = port
         self._loop = asyncio.new_event_loop()
         threading.Thread(target=self._loop.run_forever, daemon=True).start()
+        # 预热嵌入模型:避免首个请求冷启动(实测首次 14.5s,贴着 A2A 15s 超时线)
+        try:
+            asyncio.run_coroutine_threadsafe(self._warmup(), self._loop)
+        except Exception:  # noqa: BLE001
+            pass
+
+    async def _warmup(self) -> None:
+        try:
+            from backend.core import kb
+
+            await asyncio.get_running_loop().run_in_executor(None, kb.get_embedder)
+            logger.info("rag_agent.warmup_done")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("rag_agent.warmup_failed", error=str(e)[:120])
 
     def _run_sync(self, coro, timeout: float = 180.0):
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout=timeout)
