@@ -104,3 +104,32 @@ def test_load_providers_from_settings():
     s.model_kimi = "kimi-k2"
     names = [p.name for p in load_providers(s)]
     assert names == ["deepseek", "deepseek-fallback", "kimi"]
+
+
+@pytest.mark.asyncio
+async def test_achat_fallback(monkeypatch):
+    client = LLMClient(make_providers())
+    calls = []
+
+    async def fake(provider, messages, temperature, max_tokens, timeout, disable_thinking):
+        calls.append(provider.name)
+        if provider.name == "deepseek":
+            raise RuntimeError("pro 挂了")
+        return "备用异步成功"
+
+    monkeypatch.setattr(client, "_acall_provider", fake)
+    out = await client.achat([{"role": "user", "content": "hi"}])
+    assert out == "备用异步成功"
+    assert calls == ["deepseek", "deepseek-fallback"]
+    assert client.last_provider == "deepseek-fallback"
+
+
+@pytest.mark.asyncio
+async def test_achat_empty_counts_as_failure(monkeypatch):
+    client = LLMClient(make_providers())
+
+    async def fake(provider, messages, temperature, max_tokens, timeout, disable_thinking):
+        return "  " if provider.name == "deepseek" else "备用"
+
+    monkeypatch.setattr(client, "_acall_provider", fake)
+    assert await client.achat([{"role": "user", "content": "hi"}]) == "备用"

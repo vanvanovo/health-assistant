@@ -60,6 +60,7 @@ class Settings(BaseSettings):
 
     # ── 超时(对齐面试口径)────────────────────────────────────
     mcp_timeout_seconds: int = 5
+    mcp_health_url: str = "http://localhost:8020/mcp/health"   # MCP 健康工具挂载前缀(调用地址 = {url}/mcp)
 
     # ── 嵌入(P9 启用,先留位)─────────────────────────────────
     embedding_provider: str = "local"

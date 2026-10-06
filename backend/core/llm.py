@@ -161,22 +161,82 @@ class LLMClient:
         disable = provider.disable_thinking if disable_thinking is None else disable_thinking
         # trust_env=False:绕过系统代理(Windows 系统代理会让 TLS 握手失败;国内直连即可)
         http_client = httpx.Client(trust_env=False, timeout=httpx.Timeout(timeout, connect=15.0))
+        llm = self._build_llm(provider, temperature, max_tokens, disable, http_client=http_client)
+        resp = llm.invoke(_to_lc_messages(messages))
+        return _extract_text(resp)
+
+    async def achat(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        timeout: float | None = None,
+        disable_thinking: bool | None = None,
+        only: str | None = None,
+    ) -> str:
+        """异步版 provider 链(供 LangGraph 异步节点使用);语义与 chat 完全一致。"""
+        s = get_settings()
+        max_tokens = max_tokens or s.llm_max_tokens
+        timeout = timeout or s.llm_timeout_seconds
+
+        candidates = [p for p in self._providers if only is None or p.name == only]
+        if not candidates:
+            raise LLMAPIError(f"没有可用模型配置(only={only}, chain={[p.name for p in self._providers]})")
+
+        errors: list[str] = []
+        for p in candidates:
+            t0 = time.time()
+            try:
+                content = await self._acall_provider(p, messages, temperature, max_tokens, timeout, disable_thinking)
+                if not content.strip():
+                    raise LLMAPIError("返回空正文(可能 max_tokens 全被思考 token 消耗)")
+                self.last_provider, self.last_model = p.name, p.model
+                logger.info(
+                    "llm.ok", provider=p.name, model=p.model, elapsed_ms=int((time.time() - t0) * 1000)
+                )
+                return content
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"{p.name}({p.model}): {type(e).__name__}: {e}")
+                logger.warning(
+                    "llm.fail", provider=p.name, model=p.model, error=str(e), elapsed_ms=int((time.time() - t0) * 1000)
+                )
+        raise LLMAPIError("所有模型不可用 | " + " || ".join(errors))
+
+    async def _acall_provider(
+        self,
+        provider: Provider,
+        messages: list[dict],
+        temperature: float | None,
+        max_tokens: int,
+        timeout: float,
+        disable_thinking: bool | None,
+    ) -> str:
+        disable = provider.disable_thinking if disable_thinking is None else disable_thinking
+        http_client = httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(timeout, connect=15.0))
+        try:
+            llm = self._build_llm(provider, temperature, max_tokens, disable, http_async_client=http_client)
+            resp = await llm.ainvoke(_to_lc_messages(messages))
+            return _extract_text(resp)
+        finally:
+            await http_client.aclose()
+
+    @staticmethod
+    def _build_llm(provider: Provider, temperature: float | None, max_tokens: int, disable: bool, **clients) -> ChatOpenAI:
         kwargs: dict = dict(
             model=provider.model,
             api_key=provider.api_key,
             base_url=provider.base_url,
             max_tokens=max_tokens,
             max_retries=0,
-            http_client=http_client,
+            **clients,
         )
         if temperature is not None:
             kwargs["temperature"] = temperature
         if disable:
             # 官方接口实测支持;低延迟场景关闭思考,避免 max_tokens 被思考吃光
             kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
-        llm = ChatOpenAI(**kwargs)
-        resp = llm.invoke(_to_lc_messages(messages))
-        return _extract_text(resp)
+        return ChatOpenAI(**kwargs)
 
 
 _shared_client: LLMClient | None = None
