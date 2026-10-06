@@ -6,7 +6,8 @@
 
 - **V1 核心闭环 MVP ✅ 完成(2026-10-06,P0–P4)**:14 表数据底座(pgvector)/ MCP 四域 15 工具 / 记录·分析·计划三张 LangGraph 图 / 编排 + SSE / Vue3 工作台初版 / 意图评测 60/60
 - **V2 个性化与可视化 ✅ 完成(P5–P7)**:饮食双模式 / PostgresSaver 多轮记忆 + 记忆确认卡 / 画像页 / 热力图·四维雷达·完成率环形·对话联动高亮
-- V3 实施计划已出(**进行中**):P8 主动服务 ✅(提醒/简报/周报/预警 + 站内信)→ P9 健康知识 RAG + 安全边界
+- **V3 主动服务与知识问答 ✅ 完成(P8–P9)**:提醒/简报/周报/预警 + 站内信 / 健康知识 RAG(A2A 独立服务 :5021)+ 安全边界(高危双层拦截)
+- V4(P10–P11)待开工:Redis/容错/隐私 · 评测汇总 · Docker 一键起 · 云端轻量 · 演示与简历口径
 
 ## 快速开始(本机)
 
@@ -23,7 +24,11 @@ docker compose up -d postgres
 # 3) 网关(:8020;run_server.py 会在 Windows 上先切 Selector 事件循环,psycopg 需要)
 & $py run_server.py
 
-# 4) 前端(:3020,演示账号 health-demo / health-demo)
+# 4) 知识库(首次:RAG Agent 需要先建库)
+& $py scripts\build_kb.py                 # 语料 → 分块 → BGE-M3 嵌入 → pgvector
+Start-Process $py -ArgumentList "services\rag_agent\server.py"   # A2A :5021(独立进程)
+
+# 5) 前端(:3020,演示账号 health-demo / health-demo)
 cd frontend; npm install; npm run dev
 ```
 
@@ -39,6 +44,7 @@ cd frontend; npm install; npm run dev
 | `scripts/check_diet.py` | P5 饮食真实链路(10 断言) |
 | `scripts/check_memory.py phase1\|phase2` | P6 多轮指代 + 重启记忆(phase1 后请重启网关再跑 phase2) |
 | `scripts/check_notify.py` | P8 主动服务(14 断言:四类消息/幂等/已读流转) |
+| `scripts/check_rag.py phase1\|phase2` | P9 RAG 问答与降级(phase1 后停 Agent 再跑 phase2);`scripts/eval_rag.py` RAG 评测 |
 | `scripts/eval_intent.py` | 意图评测(**77 条**,报告落 docs/) |
 | `python -m pytest -q tests` | 离线回归(**97 用例**,全 mock) |
 

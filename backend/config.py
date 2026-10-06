@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     jobs_enabled: bool = True            # APScheduler 四类定时任务
     job_trigger_enabled: bool = True     # 演示/验收入口 POST /api/v1/jobs/run
 
+    # ── P9 知识库 / A2A ───────────────────────────────────────
+    kb_embedding_model_path: str = r"D:\work\NEWedurag\rag_qa\models\bge-m3"
+    kb_top_k: int = 4
+    rag_agent_port: int = 5021
+    rag_agent_url: str = "http://localhost:5021"
+    rag_via_a2a: bool = True
+    a2a_timeout_seconds: int = 15
+
     # ── 嵌入(P9 启用,先留位)─────────────────────────────────
     embedding_provider: str = "local"
     embedding_model: str = "BAAI/bge-m3"

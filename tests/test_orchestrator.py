@@ -197,6 +197,45 @@ async def test_out_of_scope_message(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_high_risk_safety_override(monkeypatch):
+    """高危信号:不调用路由器、不分发任何 Agent,只输出就医引导 + meta.safety=high。"""
+    patch_route(monkeypatch, exc=AssertionError("高危拦截不应调用路由"))
+    called = {"n": 0}
+
+    async def should_not_call(*a, **kw):
+        called["n"] += 1
+        return agent_result("x", "ok", "x")
+
+    monkeypatch.setattr(orchestrator, "run_recorder", should_not_call)
+    monkeypatch.setattr(orchestrator, "run_analyst", should_not_call)
+    evs = await collect("我胸痛应该吃什么药")
+    assert [e["data"]["intents"] for e in events(evs, "routing")] == [["safety"]]
+    text = full_text(evs)
+    assert "120" in text and "就医" in text
+    assert events(evs, "meta")[0]["data"].get("safety", {}).get("level") == "high"
+    assert called["n"] == 0
+
+
+@pytest.mark.asyncio
+async def test_knowledge_degrades_when_rag_down(monkeypatch):
+    patch_route(monkeypatch, {"intents": [{"name": "knowledge", "query": "睡不好怎么办"}], "slots": {}, "need_clarify": False, "clarify": "", "confidence": 0.9})
+
+    async def boom(query):
+        raise RuntimeError("rag down")
+
+    monkeypatch.setattr(orchestrator, "call_health_rag", boom)
+
+    async def fake_text(messages, **kw):
+        return "建议规律作息、睡前少看屏幕。"
+
+    monkeypatch.setattr(orchestrator.llm_json, "chat_text", fake_text)
+    evs = await collect("晚上睡不好怎么办")
+    text = full_text(evs)
+    assert "知识库暂不可用" in text and "仅供参考" in text
+    assert events(evs, "meta")[0]["data"]["degraded"] is True
+
+
+@pytest.mark.asyncio
 async def test_multi_turn_memory_with_checkpointer(monkeypatch):
     """挂 MemorySaver 后,第二轮请求能带上第一轮历史(多轮指代的基础)。"""
     from langgraph.checkpoint.memory import MemorySaver

@@ -8,13 +8,16 @@ import asyncio
 from datetime import date, timedelta
 
 from backend.agents.analyst.graph import run_analyst
-from backend.agents.common import tools
+from backend.agents.common import llm_json, tools
 from backend.agents.common.result import agent_result
 from backend.agents.common.utils import short_hash
 from backend.agents.diet.graph import run_diet
 from backend.agents.memory.handler import run_memory
 from backend.agents.planner.graph import run_planner
 from backend.agents.recorder.graph import run_recorder
+from backend.config import get_settings
+from backend.core import safety
+from backend.core.a2a_client import call_health_rag
 from backend.core.logger import get_logger
 from backend.core.router import prefilter, route_intent
 
@@ -109,6 +112,59 @@ async def handle_checkin(user_input: str, slots: dict) -> dict:
     )
 
 
+KNOWLEDGE_SYSTEM = (
+    "你是健康知识助手,知识库暂时不可用。"
+    "请只给出最保守的生活方式常识建议:不编造具体数字、不诊断、不开药;"
+    "语言简洁 2~3 句,结尾注明仅供参考。"
+)
+
+
+async def _handle_knowledge(query: str) -> dict:
+    """知识问答:A2A RAG 优先;失败/关闭 → llm_direct 降级(标注知识库不可用)。"""
+    s = get_settings()
+    if s.rag_via_a2a:
+        try:
+            data = await call_health_rag(query)
+            mode = data.get("answer_mode") or "rag"
+            answer = (data.get("answer") or "").strip()
+            sources = data.get("sources") or []
+            safety_info = data.get("safety") or {"level": "ok"}
+
+            if safety_info.get("level") == "high":
+                return agent_result(
+                    "knowledge", "ok", answer,
+                    data={"answer_mode": mode, "safety": safety_info},
+                )
+            if "仅供参考" not in answer:
+                answer += "\n\n" + safety.DISCLAIMER
+            card = {"type": "sources", "payload": {"sources": sources, "answer_mode": mode}} if sources else None
+            res = agent_result(
+                "knowledge", "ok", answer, card=card,
+                data={"answer_mode": mode, "sources": sources, "safety": safety_info},
+            )
+            if mode != "rag":
+                res["degraded"] = True
+            return res
+        except Exception as e:  # noqa: BLE001
+            logger.warning("knowledge.a2a_failed", error=str(e)[:200])
+    else:
+        logger.info("knowledge.a2a_disabled")
+
+    # 降级:不冒充知识库;LLM 直答 + 明确标注
+    try:
+        text = await llm_json.chat_text(
+            [
+                {"role": "system", "content": KNOWLEDGE_SYSTEM},
+                {"role": "user", "content": query},
+            ],
+            temperature=0.3,
+        )
+    except Exception:  # noqa: BLE001
+        text = "知识库与模型暂时都不可用,请稍后再试。"
+    text = str(text).strip() + "\n\n(知识库暂不可用,以上为通用建议)\n\n" + safety.DISCLAIMER
+    return agent_result("knowledge", "ok", text, degraded=True)
+
+
 async def _dispatch(name: str, query: str, slots: dict) -> dict:
     today = date.today().isoformat()
     if name == "record":
@@ -126,5 +182,5 @@ async def _dispatch(name: str, query: str, slots: dict) -> dict:
     if name == "memory":
         return await run_memory(query, today=today)
     if name == "knowledge":
-        return agent_result("knowledge", "ok", "健康知识问答会在 V3 上线,先帮你记下需求~")
+        return await _handle_knowledge(query)
     return agent_result("router", "ok", OUT_OF_SCOPE_REPLY)

@@ -16,7 +16,7 @@ from langgraph.graph.message import add_messages
 
 from backend.agents.common.result import agent_result
 from backend.config import get_settings
-from backend.core import orchestrator
+from backend.core import orchestrator, safety
 from backend.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,6 +28,7 @@ class AssistantState(TypedDict, total=False):
     route: dict          # mode: rule|clarify|dispatch;intents/slots
     results: list[dict]
     degraded: bool
+    safety_level: str    # ok | high(高危拦截)
     started_at: float
 
 
@@ -41,6 +42,19 @@ async def route_node(state) -> dict:
     t0 = time.time()
     user_input = state.get("user_input") or ""
     history = state.get("messages") or []
+
+    # ⓪ 安全边界(最高优先):高危信号直接拦截,不分发给任何 Agent
+    risk = safety.check_high_risk(user_input)
+    if risk:
+        _emit("routing", {"intents": ["safety"], "slots": {}, "confidence": 1.0})
+        async for ev in orchestrator._stream_message(risk["reply"]):
+            _emit(ev["event"], ev["data"])
+        return {
+            "route": {"mode": "rule"},
+            "safety_level": "high",
+            "messages": [HumanMessage(user_input), AIMessage(risk["reply"])],
+            "started_at": t0,
+        }
 
     # ① 规则前置(零 Token)
     pf = orchestrator.prefilter(user_input)
@@ -128,7 +142,12 @@ async def dispatch_node(state) -> dict:
 
 async def finalize_node(state) -> dict:
     elapsed = int((time.time() - (state.get("started_at") or time.time())) * 1000)
-    _emit("meta", {"elapsed_ms": elapsed, "degraded": bool(state.get("degraded")), "sources": []})
+    _emit("meta", {
+        "elapsed_ms": elapsed,
+        "degraded": bool(state.get("degraded")),
+        "sources": [],
+        "safety": {"level": state.get("safety_level") or "ok"},
+    })
     _emit("done", {})
     return {}
 
