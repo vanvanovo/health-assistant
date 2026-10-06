@@ -12,9 +12,16 @@ defineProps<{ card: any }>()
         <el-descriptions-item label="体重">{{ card.payload.record.weight_kg ?? '-' }} kg</el-descriptions-item>
         <el-descriptions-item label="睡眠">{{ card.payload.record.sleep_hours ?? '-' }} h</el-descriptions-item>
         <el-descriptions-item label="训练">
-          {{ card.payload.record.workout_minutes ?? 0 }} 分钟({{ card.payload.record.workout_type || '-' }})
+          <template v-if="card.payload.record.workout_type === 'rest'">休息日</template>
+          <template v-else-if="!card.payload.record.workout_type && !(card.payload.record.workout_minutes > 0)">-</template>
+          <template v-else>
+            <span v-if="card.payload.record.workout_minutes > 0">{{ card.payload.record.workout_minutes }} 分钟</span>
+            <span v-else>时长未记录</span>
+            <span v-if="card.payload.record.workout_type"> · {{ card.payload.record.workout_type }}</span>
+          </template>
         </el-descriptions-item>
         <el-descriptions-item label="体感">{{ card.payload.record.feeling || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="备注" :span="2">{{ card.payload.record.note || '-' }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ card.payload.mode === 'duplicate' ? '幂等复放' : '已入库' }}</el-descriptions-item>
       </el-descriptions>
       <el-descriptions v-else-if="card.payload?.item" :column="3" size="small" border style="margin-top: 6px">

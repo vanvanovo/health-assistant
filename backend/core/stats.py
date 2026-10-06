@@ -28,6 +28,9 @@ def summarize_checkins(items: list[dict]) -> dict:
     return {**counts, "elapsed": elapsed, "completion_rate": rate}
 
 
+ACTIVE_WORKOUT_TYPES = {"running", "strength", "other"}
+
+
 def summarize_records(records: list[dict], checkin_items: list[dict] | None = None) -> dict:
     """聚合统计(纯规则)。
 
@@ -43,11 +46,15 @@ def summarize_records(records: list[dict], checkin_items: list[dict] | None = No
     by_type: dict[str, int] = {}
     for r in records:
         m = r.get("workout_minutes") or 0
-        if m and int(m) > 0:
+        wtype = str(r.get("workout_type") or "")
+        # 训练日判定:有分钟数,或运动类型属于真运动(rest/空不算);
+        # “跑了5公里但没给时长”也算训练日,只是不计入分钟数(绝不编造时长)
+        if (m and int(m) > 0) or wtype in ACTIVE_WORKOUT_TYPES:
             workout_days += 1
-            total_minutes += int(m)
-            wtype = str(r.get("workout_type") or "other")
-            by_type[wtype] = by_type.get(wtype, 0) + 1
+            if m and int(m) > 0:
+                total_minutes += int(m)
+            if wtype:
+                by_type[wtype] = by_type.get(wtype, 0) + 1
 
     weight_block = None
     weights = [(r.get("date"), _f(r.get("weight_kg"))) for r in records if _f(r.get("weight_kg")) is not None]

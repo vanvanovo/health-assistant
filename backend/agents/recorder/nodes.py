@@ -30,6 +30,8 @@ def _record_summary(cleaned: dict) -> str:
     parts = []
     if cleaned.get("workout_minutes"):
         parts.append(f"{TYPE_CN.get(cleaned.get('workout_type'), '运动')} {int(cleaned['workout_minutes'])} 分钟")
+    elif cleaned.get("workout_type") in ("running", "strength", "other"):
+        parts.append(TYPE_CN.get(cleaned["workout_type"], "运动"))
     elif cleaned.get("workout_type") == "rest":
         parts.append("休息日")
     if cleaned.get("weight_kg") is not None:
@@ -38,6 +40,8 @@ def _record_summary(cleaned: dict) -> str:
         parts.append(f"睡眠 {cleaned['sleep_hours']} 小时")
     if cleaned.get("feeling"):
         parts.append(f"体感{FEEL_CN.get(cleaned['feeling'], cleaned['feeling'])}")
+    if cleaned.get("note"):
+        parts.append(f"备注:{str(cleaned['note'])[:24]}")
     return "、".join(parts)
 
 

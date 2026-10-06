@@ -54,3 +54,16 @@ def test_summarize_checkins_all_pending():
     c = summarize_checkins([{"status": "pending"}, {"status": "pending"}])
     assert c["elapsed"] == 0
     assert c["completion_rate"] is None
+
+
+def test_workout_day_without_minutes_still_counts():
+    """“跑了5公里但没给时长”:也算训练日,只是不计分钟数(绝不编造时长)。"""
+    from datetime import date
+    records = [
+        _rec(date(2026, 9, 1), workout_type="running", workout_minutes=None, weight_kg=70.0),
+        _rec(date(2026, 9, 2), workout_type="rest", workout_minutes=None),
+    ]
+    s = summarize_records(records)
+    assert s["workout"]["days"] == 1
+    assert s["workout"]["total_minutes"] == 0
+    assert s["workout"]["by_type"] == {"running": 1}
