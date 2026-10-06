@@ -177,6 +177,16 @@ async function confirmMemory() {
       <div v-else-if="card.payload?.summary" class="diet-note">{{ card.payload.summary }}</div>
     </template>
 
+    <template v-else-if="card.type === 'sources'">
+      <el-alert :closable="false" type="info"
+        :title="`🔎 来源(答案依据)· ${card.payload?.answer_mode === 'rag' ? '知识库检索' : '通用建议'}`" />
+      <div v-for="(s, i) in (card.payload?.sources || [])" :key="i" class="source-item">
+        <b>{{ s.title }}</b>
+        <span class="score">相似度 {{ s.score ?? '-' }}</span>
+        <div class="snippet">{{ s.snippet }}</div>
+      </div>
+    </template>
+
     <pre v-else class="raw">{{ JSON.stringify(card, null, 2) }}</pre>
   </div>
 </template>
@@ -187,6 +197,9 @@ async function confirmMemory() {
 .anomalies { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
 .diet-total { margin-top: 6px; color: #606266; font-size: 13px; }
 .diet-note { margin-top: 4px; color: #999; font-size: 12px; }
+.source-item { margin-top: 8px; }
+.source-item .score { color: #999; font-size: 12px; margin-left: 8px; }
+.source-item .snippet { color: #666; font-size: 13px; margin-top: 2px; }
 .confirm-row { margin-top: 8px; display: flex; gap: 8px; }
 .raw { background: #fafafa; padding: 8px; font-size: 12px; max-height: 200px; overflow: auto; }
 </style>
