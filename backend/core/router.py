@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import date
 
 from backend.agents.common import llm_json
+from backend.config import get_settings
+from backend.core import cache
 
 INTENTS = {"record", "checkin", "analyze", "plan", "diet", "memory", "knowledge", "out_of_scope"}
 
@@ -117,7 +120,18 @@ def _format_history(history, limit: int = 6, width: int = 100) -> str:
 
 
 async def route_intent(user_input: str, today: str | None = None, history=None) -> dict:
-    """LLM 意图识别(可带近期对话,用于理解指代);输出经归一与白名单清洗。"""
+    """LLM 意图识别(可带近期对话,用于理解指代);输出经归一与白名单清洗。
+
+    P10:无上下文(history 为空)时走 5 分钟缓存;带指代的请求不缓存,避免语义漂移。
+    """
+    use_cache = not history
+    cache_key = ""
+    if use_cache:
+        cache_key = "cache:intent:" + hashlib.sha1((user_input or "").encode("utf-8")).hexdigest()
+        hit = await cache.cache_get(cache_key)
+        if isinstance(hit, dict) and hit.get("intents"):
+            return hit
+
     system = build_system(today or date.today().isoformat())
     ctx = _format_history(history)
     if ctx:
@@ -163,10 +177,13 @@ async def route_intent(user_input: str, today: str | None = None, history=None) 
     except (TypeError, ValueError):
         confidence = 0.8
 
-    return {
+    result = {
         "intents": intents,
         "slots": _clean_slots(data.get("slots")),
         "need_clarify": bool(data.get("need_clarify")),
         "clarify": str(data.get("clarify") or "").strip(),
         "confidence": max(0.0, min(confidence, 1.0)),
     }
+    if use_cache and cache_key:
+        await cache.cache_set(cache_key, result, ttl=get_settings().cache_ttl_intent)
+    return result

@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     rag_via_a2a: bool = True
     a2a_timeout_seconds: int = 15
 
+    # ── P10 Redis(只做"真用"的三件事:看板缓存 / 路由缓存 / 写锁)──
+    cache_ttl_dashboard: int = 60      # 看板聚合缓存(秒)
+    cache_ttl_intent: int = 300        # 意图路由缓存(秒;仅无上下文时启用)
+    lock_ttl: int = 10                 # 写锁持有时间(秒)
+    lock_wait: float = 2.0             # 写锁等待时间(秒)
+
     # ── 嵌入(P9 启用,先留位)─────────────────────────────────
     embedding_provider: str = "local"
     embedding_model: str = "BAAI/bge-m3"

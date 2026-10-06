@@ -125,7 +125,16 @@ class HealthRagAgent(A2AServer):
             {"title": d["title"], "snippet": d["content"][:120], "score": d.get("score")}
             for d in docs
         ]
-        logger.info("rag_agent.answered", query=query[:50], mode=mode, hits=len(sources))
+        # 隐私:不落问答原文(可能含体重等健康数值),只记哈希与长度
+        import hashlib as _hashlib
+
+        logger.info(
+            "rag_agent.answered",
+            query_sha=_hashlib.sha1(query.encode("utf-8")).hexdigest()[:8],
+            query_len=len(query),
+            mode=mode,
+            hits=len(sources),
+        )
         return {
             "answer": answer, "sources": sources, "answer_mode": mode,
             "need_clarify": False, "clarify": "", "safety": {"level": "ok"},

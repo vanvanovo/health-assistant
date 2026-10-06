@@ -16,7 +16,7 @@ from backend.agents.memory.handler import run_memory
 from backend.agents.planner.graph import run_planner
 from backend.agents.recorder.graph import run_recorder
 from backend.config import get_settings
-from backend.core import safety
+from backend.core import cache, safety
 from backend.core.a2a_client import call_health_rag
 from backend.core.logger import get_logger
 from backend.core.router import prefilter, route_intent
@@ -89,13 +89,22 @@ async def handle_checkin(user_input: str, slots: dict) -> dict:
             data={"item": data.get("item")},
         )
 
-    res = await tools.call_tool(
-        "upsert_checkin",
-        {
-            "plan_item_id": target["id"], "status": status, "feeling_score": feeling,
-            "idempotency_key": f"ck-{target['id']}-{today}-{short_hash(user_input)}",
-        },
-    )
+    # P10:同一计划项并发打卡 → 短锁串行化(Redis 不可用降级放行)
+    lock_name = f"lock:checkin:{target['id']}"
+    try:
+        lock_token = await cache.acquire_lock(lock_name)
+    except cache.LockBusy:
+        return agent_result("checkin", "ok", "这个打卡项正在处理另一笔请求,请稍后重试。")
+    try:
+        res = await tools.call_tool(
+            "upsert_checkin",
+            {
+                "plan_item_id": target["id"], "status": status, "feeling_score": feeling,
+                "idempotency_key": f"ck-{target['id']}-{today}-{short_hash(user_input)}",
+            },
+        )
+    finally:
+        await cache.release_lock(lock_name, lock_token)
     data = tools.tool_data(res, {})
     if not data:
         return agent_result(

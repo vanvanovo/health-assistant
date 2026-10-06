@@ -130,3 +130,43 @@ async def test_route_intent_includes_history(monkeypatch):
     assert "近期对话" in system_content
     assert "我最近一个月状态怎么样?" in system_content
     assert r["slots"]["days"] == 7
+
+
+@pytest.mark.asyncio
+async def test_route_intent_cached_without_history(monkeypatch):
+    """P10:无上下文时走缓存;带历史时不走缓存(避免指代语义漂移)。"""
+    from backend.core import cache as cache_mod
+
+    class _FakeRedis:
+        def __init__(self):
+            self.store: dict = {}
+
+        async def get(self, k):
+            return self.store.get(k)
+
+        async def set(self, k, v, nx=False, ex=None):
+            self.store[k] = v
+            return True
+
+        async def delete(self, k):
+            self.store.pop(k, None)
+
+    fake_store = _FakeRedis()
+    monkeypatch.setattr(cache_mod, "_client", lambda: fake_store)
+    calls = {"n": 0}
+
+    async def fake_llm(messages, **kw):
+        calls["n"] += 1
+        return {"intents": ["record"], "slots": {}, "confidence": 0.9}
+
+    monkeypatch.setattr(llm_json, "chat_json", fake_llm)
+    r1 = await intent_router.route_intent("今天慢跑5公里,体重68", today=TODAY)
+    r2 = await intent_router.route_intent("今天慢跑5公里,体重68", today=TODAY)
+    assert calls["n"] == 1 and r1 == r2
+
+    class _Msg:
+        def __init__(self, mtype, content):
+            self.type, self.content = mtype, content
+
+    await intent_router.route_intent("今天慢跑5公里,体重68", today=TODAY, history=[_Msg("human", "x")])
+    assert calls["n"] == 2

@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from backend.agents.common import llm_json, tools
 from backend.agents.common.result import agent_result
 from backend.agents.common.utils import short_hash
+from backend.core import cache
 
 from . import prompts
 from .rules import compute_constraints, target_week_start, validate_plan_items
@@ -77,16 +78,25 @@ async def generate_node(state) -> dict:
 async def save_node(state) -> dict:
     plan = state["llm_plan"]
     key = f"planner:{state['week_start']}:{short_hash((state.get('user_input') or '') + state['constraints']['level'])}"
-    res = await tools.call_tool(
-        "save_plan",
-        {
-            "week_start": state["week_start"],
-            "items": plan["items"],
-            "summary": plan["summary"],
-            "rationale": plan["rationale"],
-            "idempotency_key": key,
-        },
-    )
+    # P10:同周并发保存 → 短锁串行化(Redis 不可用降级放行)
+    lock_name = f"lock:plan:{state['week_start']}"
+    try:
+        lock_token = await cache.acquire_lock(lock_name)
+    except cache.LockBusy:
+        return {"saved": {"status": "busy", "message": "另一笔计划保存正在进行,请稍后重试"}}
+    try:
+        res = await tools.call_tool(
+            "save_plan",
+            {
+                "week_start": state["week_start"],
+                "items": plan["items"],
+                "summary": plan["summary"],
+                "rationale": plan["rationale"],
+                "idempotency_key": key,
+            },
+        )
+    finally:
+        await cache.release_lock(lock_name, lock_token)
     return {"saved": res if isinstance(res, dict) else {}}
 
 
