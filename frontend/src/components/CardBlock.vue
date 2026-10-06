@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { applyMemory } from '@/api'
 
 const props = defineProps<{ card: any }>()
+const router = useRouter()
 
 const MEAL_CN: Record<string, string> = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' }
 
@@ -27,6 +29,13 @@ function pretty(v: any): string {
 function pct(v: any): string {
   const n = Number(v)
   return Number.isFinite(n) ? `${Math.round(n * 100)}%` : '-'
+}
+
+function focusInDashboard() {
+  const p = props.card?.payload
+  if (!p?.date_from) return
+  sessionStorage.setItem('health:focusRange', JSON.stringify({ from: p.date_from, to: p.date_to }))
+  router.push('/dashboard')
 }
 
 const confirming = ref(false)
@@ -87,6 +96,9 @@ async function confirmMemory() {
       <div v-if="card.payload?.anomalies?.length" class="anomalies">
         <el-tag v-for="(a, i) in card.payload.anomalies" :key="i"
           :type="a.level === 'warn' ? 'warning' : 'info'" size="small">{{ a.message }}</el-tag>
+      </div>
+      <div v-if="card.payload?.date_from" style="margin-top: 6px">
+        <el-button size="small" type="primary" text @click="focusInDashboard">📊 在看板中查看</el-button>
       </div>
     </template>
 

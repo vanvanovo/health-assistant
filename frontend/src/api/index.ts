@@ -15,6 +15,16 @@ export async function fetchTrends(from: string, to: string) {
   return data as { series: Array<{ date: string; weight_kg: number | null; workout_minutes: number; sleep_hours: number | null }> }
 }
 
+export async function fetchHeatmap(days = 90) {
+  const { data } = await client.get('/dashboard/heatmap', { params: { days } })
+  return data as { from: string; to: string; days: Array<{ date: string; workout_minutes: number; checkin_done: number }> }
+}
+
+export async function fetchRadar(weeks = 4) {
+  const { data } = await client.get('/dashboard/radar', { params: { weeks } })
+  return data as { weeks: number; scores: Record<string, number>; detail: Record<string, any> }
+}
+
 export async function fetchCurrentPlan(date?: string) {
   const { data } = await client.get('/plans/current', { params: { date } })
   return data as { plan: any; progress: any }

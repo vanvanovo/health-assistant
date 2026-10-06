@@ -92,6 +92,25 @@ async def test_route_intent_empty_intents(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_route_intent_merges_same_name(monkeypatch):
+    """同一天多项数据被模型拆成多个 record → 合并为一个(片段拼接)。"""
+    async def fake(messages, **kw):
+        return {
+            "intents": [
+                {"name": "record", "query": "今天慢跑30分钟"},
+                {"name": "record", "query": "体重68.1"},
+                {"name": "record", "query": "睡了7小时"},
+            ],
+            "confidence": 0.9,
+        }
+
+    monkeypatch.setattr(llm_json, "chat_json", fake)
+    r = await intent_router.route_intent("今天慢跑 30 分钟,体重 68.1,睡了 7 小时", today=TODAY)
+    assert [i["name"] for i in r["intents"]] == ["record"]
+    assert r["intents"][0]["query"] == "今天慢跑30分钟、体重68.1、睡了7小时"
+
+
+@pytest.mark.asyncio
 async def test_route_intent_includes_history(monkeypatch):
     captured = {}
 

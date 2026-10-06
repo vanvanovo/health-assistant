@@ -84,7 +84,8 @@ async def _login(client) -> str:
 
 
 async def phase1() -> int:
-    async with httpx.AsyncClient(timeout=httpx.Timeout(240.0, connect=10.0), trust_env=False) as client:
+    limits = httpx.Limits(max_keepalive_connections=0, max_connections=20)
+    async with httpx.AsyncClient(timeout=httpx.Timeout(240.0, connect=10.0), trust_env=False, limits=limits) as client:
         # 0) 记忆层类型(应为 postgres)
         h = await client.get(f"{BASE}/health")
         check(h.json().get("memory") == "postgres", f"记忆层 = postgres(实际 {h.json().get('memory')})")
@@ -133,7 +134,8 @@ async def phase1() -> int:
 
 
 async def phase2() -> int:
-    async with httpx.AsyncClient(timeout=httpx.Timeout(240.0, connect=10.0), trust_env=False) as client:
+    limits = httpx.Limits(max_keepalive_connections=0, max_connections=20)
+    async with httpx.AsyncClient(timeout=httpx.Timeout(240.0, connect=10.0), trust_env=False, limits=limits) as client:
         token = await _login(client)
         evs = await sse(client, token, "那这周呢?")
         routed = [e["data"] for e in has(evs, "routing")]

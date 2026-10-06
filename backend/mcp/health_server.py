@@ -691,6 +691,78 @@ async def list_plans(weeks: int = 4, user_id: int | None = None) -> str:
         return _ok({"count": len(plans), "plans": plans})
 
 
+# ── 统计域(P7:看板)──────────────────────────────────────────
+@mcp.tool()
+async def get_meal_summary(date_from: str, date_to: str, user_id: int | None = None) -> str:
+    """统计时间范围内的饮食记录情况(有记录天数/条目数/日均热量与蛋白;供饮食评分)。
+
+    Args:
+        date_from: 起始日期 YYYY-MM-DD
+        date_to: 结束日期 YYYY-MM-DD
+    """
+    d1, d2 = _parse_date(date_from), _parse_date(date_to)
+    if not d1 or not d2 or d1 > d2:
+        return _msg("invalid", "日期范围不正确(需 YYYY-MM-DD 且 from <= to)")
+    async with get_sessionmaker()() as session:
+        uid = await _resolve_user(session, user_id)
+        if not uid:
+            return _msg("not_found", "用户不存在")
+        rows = (
+            await session.execute(
+                select(M.Meal).where(M.Meal.user_id == uid, M.Meal.date.between(d1, d2))
+            )
+        ).scalars().all()
+        n_days = len({r.date for r in rows})
+        total_kcal = sum(_f(r.kcal) or 0 for r in rows)
+        total_protein = sum(_f(r.protein_g) or 0 for r in rows)
+        return _ok({
+            "days_recorded": n_days,
+            "meal_items": len(rows),
+            "avg_kcal_per_day": round(total_kcal / n_days, 1) if n_days else 0,
+            "avg_protein_per_day": round(total_protein / n_days, 1) if n_days else 0,
+        })
+
+
+@mcp.tool()
+async def get_daily_stats(date_from: str, date_to: str, user_id: int | None = None) -> str:
+    """按天返回训练分钟与打卡完成数(供日历热力图)。
+
+    Args:
+        date_from: 起始日期 YYYY-MM-DD
+        date_to: 结束日期 YYYY-MM-DD
+    """
+    d1, d2 = _parse_date(date_from), _parse_date(date_to)
+    if not d1 or not d2 or d1 > d2:
+        return _msg("invalid", "日期范围不正确(需 YYYY-MM-DD 且 from <= to)")
+    async with get_sessionmaker()() as session:
+        uid = await _resolve_user(session, user_id)
+        if not uid:
+            return _msg("not_found", "用户不存在")
+        recs = (
+            await session.execute(
+                select(M.HealthRecord).where(M.HealthRecord.user_id == uid, M.HealthRecord.date.between(d1, d2))
+            )
+        ).scalars().all()
+        items = (
+            await session.execute(
+                select(M.PlanItem).where(M.PlanItem.user_id == uid, M.PlanItem.date.between(d1, d2))
+            )
+        ).scalars().all()
+        by_day: dict[str, dict] = {}
+        for r in recs:
+            k = r.date.isoformat()
+            by_day.setdefault(k, {"date": k, "workout_minutes": 0, "checkin_done": 0})
+            if r.workout_minutes and int(r.workout_minutes) > 0:
+                by_day[k]["workout_minutes"] += int(r.workout_minutes)
+        for it in items:
+            k = it.date.isoformat()
+            by_day.setdefault(k, {"date": k, "workout_minutes": 0, "checkin_done": 0})
+            if it.status == "done":
+                by_day[k]["checkin_done"] += 1
+        days = sorted(by_day.values(), key=lambda x: x["date"])
+        return _ok({"count": len(days), "days": days})
+
+
 # ── 营养域 ───────────────────────────────────────────────────
 def _food_view(f: M.NutritionFood) -> dict:
     kcal = _f(f.calories) or 0.0

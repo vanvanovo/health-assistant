@@ -81,7 +81,9 @@ def text_of(events):
 async def main() -> int:
     configure_logging()
     timeout = httpx.Timeout(240.0, connect=10.0)
-    async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
+    # 禁用 keep-alive:SSE 流结束后服务端可能关闭连接,复用旧连接会偶发 ReadError(实测)
+    limits = httpx.Limits(max_keepalive_connections=0, max_connections=20)
+    async with httpx.AsyncClient(timeout=timeout, trust_env=False, limits=limits) as client:
         # 0) 未登录 → 401
         r = await client.post(f"{BASE}/api/v1/chat/stream", json={"message": "hi"})
         check(r.status_code == 401, "未带 token → 401")
@@ -152,6 +154,14 @@ async def main() -> int:
             headers=H,
         )
         check(r.status_code == 200 and len(r.json().get("series", [])) >= 25, "dashboard/trends ≥25 天序列")
+        r = await client.get(f"{BASE}/api/v1/dashboard/heatmap", params={"days": 90}, headers=H)
+        check(r.status_code == 200 and len(r.json().get("days", [])) >= 80, "dashboard/heatmap ≥80 天数据")
+        r = await client.get(f"{BASE}/api/v1/dashboard/radar", params={"weeks": 4}, headers=H)
+        check(
+            r.status_code == 200
+            and set(r.json().get("scores", {})) == {"sport", "sleep", "diet", "recovery"},
+            "dashboard/radar 四维评分",
+        )
 
         # 8) 计划查询 + 表单打卡
         r = await client.get(f"{BASE}/api/v1/plans/current", headers=H)

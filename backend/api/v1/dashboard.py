@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, Query
 
 from backend.agents.common import tools
+from backend.core.stats import compute_radar
 from backend.dependencies import get_current_user
 
 router = APIRouter(prefix="/dashboard", tags=["看板"])
@@ -72,3 +73,38 @@ async def trends(
         for r in (records.get("records") or [])
     ]
     return {"from": d1.isoformat(), "to": d2.isoformat(), "series": series}
+
+
+@router.get("/heatmap")
+async def heatmap(days: int = Query(90, ge=7, le=180), user: dict = Depends(get_current_user)):
+    """近 N 天热力图数据:每天训练分钟 + 打卡完成数(前端可切换)。"""
+    today = date.today()
+    d_from = today - timedelta(days=days - 1)
+    data = tools.tool_data(
+        await tools.call_tool(
+            "get_daily_stats", {"date_from": d_from.isoformat(), "date_to": today.isoformat()}
+        ),
+        {},
+    ) or {}
+    return {"from": d_from.isoformat(), "to": today.isoformat(), "days": data.get("days", [])}
+
+
+@router.get("/radar")
+async def radar(weeks: int = Query(4, ge=1, le=8), user: dict = Depends(get_current_user)):
+    """四维健康评分(运动/睡眠/饮食/恢复;规则加权,公式见 core/stats.py)。"""
+    today = date.today()
+    d_from = today - timedelta(days=weeks * 7 - 1)
+    records = tools.tool_data(
+        await tools.call_tool(
+            "query_records",
+            {"date_from": d_from.isoformat(), "date_to": today.isoformat(), "limit": 180},
+        ),
+        {},
+    ) or {}
+    meals = tools.tool_data(
+        await tools.call_tool(
+            "get_meal_summary", {"date_from": d_from.isoformat(), "date_to": today.isoformat()}
+        ),
+        {},
+    ) or {}
+    return compute_radar(records.get("records") or [], int(meals.get("days_recorded") or 0), weeks)

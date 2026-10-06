@@ -5,7 +5,8 @@
 ## 进度
 
 - **V1 核心闭环 MVP ✅ 完成(2026-10-06,P0–P4)**:14 表数据底座(pgvector)/ MCP 四域 15 工具 / 记录·分析·计划三张 LangGraph 图 / 编排 + SSE / Vue3 工作台初版 / 意图评测 60/60
-- V2 实施计划已出(**进行中**):P5 饮食 Agent ✅ → P6 画像与长期记忆 ✅(主图挂 PostgresSaver,多轮指代 + 确认卡)→ P7 可视化深化
+- **V2 个性化与可视化 ✅ 完成(P5–P7)**:饮食双模式 / PostgresSaver 多轮记忆 + 记忆确认卡 / 画像页 / 热力图·四维雷达·完成率环形·对话联动高亮
+- V3(P8–P9)待开工:主动服务(提醒/简报/周报/预警)+ 健康知识 RAG
 
 ## 快速开始(本机)
 
@@ -32,11 +33,13 @@ cd frontend; npm install; npm run dev
 |---|---|
 | `scripts/check_llm.py` | P0 LLM 主备冒烟(含降级链) |
 | `scripts/check_data.py` | P1 数据底座断言 |
-| `scripts/check_health_mcp.py` | P2 MCP 15 工具(35 断言,结束自动复原数据) |
+| `scripts/check_health_mcp.py` | P2 MCP **18 工具**(35 断言,结束自动复原数据) |
 | `scripts/check_agents.py` | P3 三图真实链路(12 断言) |
-| `scripts/check_e2e.py` | P4 端到端(20 断言:SSE/看板/打卡/鉴权) |
-| `scripts/eval_intent.py` | 意图评测(60 条,报告落 docs/) |
-| `python -m pytest -q tests` | 离线回归(61 用例,全 mock) |
+| `scripts/check_e2e.py` | P4–P7 端到端(**28 断言**:SSE/看板/饮食/记忆/鉴权) |
+| `scripts/check_diet.py` | P5 饮食真实链路(10 断言) |
+| `scripts/check_memory.py phase1\|phase2` | P6 多轮指代 + 重启记忆(phase1 后请重启网关再跑 phase2) |
+| `scripts/eval_intent.py` | 意图评测(**77 条**,报告落 docs/) |
+| `python -m pytest -q tests` | 离线回归(**97 用例**,全 mock) |
 
 ## 文档
 

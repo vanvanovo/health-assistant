@@ -37,9 +37,13 @@ def summarize_records(records: list[dict], checkin_items: list[dict] | None = No
     records: [{date, workout_type, workout_minutes, weight_kg, sleep_hours, feeling}]
     checkin_items: [{status, kind, date, title}] —— 可选,用于计划完成率
     """
-    dates = [r.get("date") for r in records if r.get("date")]
-    date_from = min(dates).isoformat() if dates else None
-    date_to = max(dates).isoformat() if dates else None
+    dates: list[str] = []
+    for r in records:
+        d = r.get("date")
+        if d:
+            dates.append(d.isoformat()[:10] if hasattr(d, "isoformat") else str(d)[:10])
+    date_from = min(dates) if dates else None
+    date_to = max(dates) if dates else None
 
     workout_days = 0
     total_minutes = 0
@@ -98,4 +102,81 @@ def summarize_records(records: list[dict], checkin_items: list[dict] | None = No
         "sleep": sleep_block,
         "feeling": feelings,
         "checkin": checkin_block,
+    }
+
+
+# ── P7:四维健康评分(全部规则化、可解释、可单测)──────────────
+def _training_streak(records: list[dict]) -> int:
+    """最长连续训练天数(有分钟数或运动类型属于真运动;rest/空不算)。"""
+    from datetime import date as _date
+
+    days = set()
+    for r in records:
+        d = r.get("date")
+        wtype = str(r.get("workout_type") or "")
+        m = r.get("workout_minutes") or 0
+        if d and ((m and int(m) > 0) or wtype in ACTIVE_WORKOUT_TYPES):
+            try:
+                days.add(_date.fromisoformat(str(d)[:10]))
+            except ValueError:
+                continue
+    if not days:
+        return 0
+    ordered = sorted(days)
+    best = cur = 1
+    for prev, nxt in zip(ordered, ordered[1:]):
+        if (nxt - prev).days == 1:
+            cur += 1
+            best = max(best, cur)
+        else:
+            cur = 1
+    return best
+
+
+def compute_radar(records: list[dict], meal_days: int, weeks: int = 4) -> dict:
+    """四维评分(0~100,公式见注释,可解释):
+    运动 = min(100, 训练天数 ÷ (4×周数) × 100)(目标 4 次/周)
+    睡眠 = 100 − |平均睡眠 − 7.5| × 25(− 平均 <6.5 再 −10),截断 0~100
+    饮食 = 有饮食记录的天数 ÷ (7×周数) × 100
+    恢复 = 100 − 疲惫占比 × 80 − max(0, 最长连续训练天数 − 2) × 10,截断 0~100
+    """
+    summary = summarize_records(records)
+    weeks = max(int(weeks), 1)
+    total_days = weeks * 7
+
+    workout_days = (summary.get("workout") or {}).get("days") or 0
+    sport = min(100.0, workout_days / (4.0 * weeks) * 100)
+
+    sleep_avg = (summary.get("sleep") or {}).get("avg")
+    if sleep_avg is None:
+        sleep = 60.0
+    else:
+        sleep = 100.0 - abs(sleep_avg - 7.5) * 25 - (10.0 if sleep_avg < 6.5 else 0.0)
+        sleep = max(0.0, min(100.0, sleep))
+
+    diet = max(0.0, min(100.0, int(meal_days) / total_days * 100))
+
+    feel = summary.get("feeling") or {}
+    total_feel = sum(feel.get(k, 0) or 0 for k in ("good", "normal", "tired"))
+    tired_ratio = (feel.get("tired", 0) or 0) / total_feel if total_feel else 0.0
+    streak = _training_streak(records)
+    recovery = 100.0 - tired_ratio * 80 - max(0, streak - 2) * 10
+    recovery = max(0.0, min(100.0, recovery))
+
+    return {
+        "weeks": weeks,
+        "scores": {
+            "sport": round(sport),
+            "sleep": round(sleep),
+            "diet": round(diet),
+            "recovery": round(recovery),
+        },
+        "detail": {
+            "workout_days": workout_days,
+            "sleep_avg": sleep_avg,
+            "meal_days": int(meal_days),
+            "tired_ratio": round(tired_ratio, 2),
+            "training_streak": streak,
+            "overall": round((sport + sleep + diet + recovery) / 4),
+        },
     }

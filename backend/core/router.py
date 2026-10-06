@@ -44,6 +44,7 @@ SYSTEM_TEMPLATE = """你是个人健康助手的意图识别模块。今天是 _
 
 规则:
 1. 一句话含多个诉求 → 输出多个 intent,保持原文顺序;但不要过度拆分:同一个诉求只用一个 intent。
+   同一天的多项健康数据(运动/体重/睡眠/体感)= 同一个 record,不要拆成多个。
 2. record 与 checkin 的区分:描述"今天做了什么/身体状态如何"(含体感、睡眠、体重)→ record;
    只有针对计划项表达"做了/没做/做了一半"(如"训练完成了""鸽了")→ checkin;"今天休息"属于 record(记录休息日)。
    长期偏好/禁忌/未来的事件陈述(如"以后别排深蹲跳""下周一到周三出差")→ memory,不是 record。
@@ -143,6 +144,19 @@ async def route_intent(user_input: str, today: str | None = None, history=None) 
         intents.append({"name": name, "query": str(query)})
     if not intents:
         intents = [{"name": "out_of_scope", "query": user_input}]
+
+    # 同意图合并:同一 handler 多次出现 → 合并为一个(原文片段用「、」拼接)
+    merged: dict[str, str] = {}
+    order: list[str] = []
+    for it in intents:
+        name, q = it["name"], (it.get("query") or user_input)
+        if name in merged:
+            if str(q) not in merged[name]:
+                merged[name] = f"{merged[name]}、{q}"
+        else:
+            merged[name] = str(q)
+            order.append(name)
+    intents = [{"name": n, "query": merged[n]} for n in order]
 
     try:
         confidence = float(data.get("confidence", 0.8))
