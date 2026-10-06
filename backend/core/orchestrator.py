@@ -13,6 +13,7 @@ from backend.agents.analyst.graph import run_analyst
 from backend.agents.common import tools
 from backend.agents.common.result import agent_result
 from backend.agents.common.utils import short_hash
+from backend.agents.diet.graph import run_diet
 from backend.agents.planner.graph import run_planner
 from backend.agents.recorder.graph import run_recorder
 from backend.core.logger import get_logger
@@ -121,8 +122,10 @@ async def _dispatch(name: str, query: str, slots: dict) -> dict:
         return await run_analyst(date_from=date_from, date_to=today, today=today)
     if name == "plan":
         return await run_planner(query, today=today)
-    if name in ("diet", "knowledge"):
-        return agent_result(name, "ok", "这个能力会在 V2/V3 上线,先帮你记下需求~")
+    if name == "diet":
+        return await run_diet(query, today=today)
+    if name == "knowledge":
+        return agent_result("knowledge", "ok", "健康知识问答会在 V3 上线,先帮你记下需求~")
     return agent_result("router", "ok", OUT_OF_SCOPE_REPLY)
 
 

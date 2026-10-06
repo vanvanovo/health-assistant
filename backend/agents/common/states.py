@@ -45,3 +45,27 @@ class PlannerState(TypedDict, total=False):
     llm_plan: dict           # LLM 生成的计划 JSON(已本地校验)
     saved: dict              # MCP 保存结果
     result: dict
+
+
+class DietState(TypedDict, total=False):
+    """饮食图(双模式):log 记录估算 / recommend 食谱推荐。"""
+
+    user_input: str
+    today: str
+    mode: str                # log | recommend
+    parse: dict              # classify 抽取结果
+    # log 分支
+    date: str
+    meal_type: str
+    matched: list[dict]      # 匹配营养库后的条目(含 ref)
+    items: list[dict]        # 换算后的明细
+    totals: dict
+    errors: list[dict]
+    saved: dict
+    # recommend 分支
+    needs: dict              # 规则算出的每日需求
+    profile: dict
+    candidates: list[dict]   # 候选食物(只能从中选)
+    meals: dict              # LLM 编排结果(已校验)
+    summary: str
+    result: dict

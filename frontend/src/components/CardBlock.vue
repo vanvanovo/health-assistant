@@ -1,5 +1,20 @@
 <script setup lang="ts">
-defineProps<{ card: any }>()
+import { computed } from 'vue'
+
+const props = defineProps<{ card: any }>()
+
+const MEAL_CN: Record<string, string> = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' }
+
+const mealRows = computed(() => {
+  const meals = props.card?.payload?.meals || {}
+  const rows: any[] = []
+  for (const [slot, items] of Object.entries(meals)) {
+    for (const it of ((items as any[]) || [])) {
+      rows.push({ slot: MEAL_CN[slot] || slot, ...it })
+    }
+  }
+  return rows
+})
 </script>
 
 <template>
@@ -57,6 +72,40 @@ defineProps<{ card: any }>()
       </el-table>
     </template>
 
+    <template v-else-if="card.type === 'diet'">
+      <el-alert :closable="false" type="success"
+        :title="card.payload?.mode === 'recommend' ? '🍽️ 食谱卡' : '🍽️ 饮食卡'" />
+      <template v-if="card.payload?.mode === 'log'">
+        <el-table :data="card.payload.items || []" size="small" style="margin-top: 6px">
+          <el-table-column prop="food" label="食物" />
+          <el-table-column prop="amount_g" label="克数" width="80" />
+          <el-table-column prop="kcal" label="热量" width="80" />
+          <el-table-column prop="protein_g" label="蛋白" width="80" />
+        </el-table>
+        <div class="diet-total" v-if="card.payload.day_totals">
+          今日累计约 {{ card.payload.day_totals.kcal }} kcal / 蛋白 {{ card.payload.day_totals.protein_g }}g
+        </div>
+        <div class="diet-total" v-if="card.payload.errors?.length">
+          未识别:{{ card.payload.errors.map((e: any) => e.food).join('、') }}
+        </div>
+      </template>
+      <template v-else>
+        <div class="diet-total">
+          需求:{{ card.payload.needs?.kcal }} kcal / 蛋白 {{ card.payload.needs?.protein_g }}g({{ card.payload.needs?.goal }})
+        </div>
+        <el-table :data="mealRows" size="small" style="margin-top: 6px">
+          <el-table-column prop="slot" label="餐次" width="80" />
+          <el-table-column prop="food" label="食物" />
+          <el-table-column prop="amount_g" label="克数" width="80" />
+          <el-table-column prop="kcal" label="热量" width="80" />
+        </el-table>
+        <div class="diet-total">
+          合计约 {{ card.payload.totals?.kcal }} kcal / 蛋白 {{ card.payload.totals?.protein_g }}g
+        </div>
+      </template>
+      <div class="diet-note" v-if="card.payload?.note">{{ card.payload.note }}</div>
+    </template>
+
     <pre v-else class="raw">{{ JSON.stringify(card, null, 2) }}</pre>
   </div>
 </template>
@@ -65,5 +114,7 @@ defineProps<{ card: any }>()
 .card-block { margin: 8px 0; }
 .stats { display: flex; gap: 24px; margin-top: 8px; flex-wrap: wrap; }
 .anomalies { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.diet-total { margin-top: 6px; color: #606266; font-size: 13px; }
+.diet-note { margin-top: 4px; color: #999; font-size: 12px; }
 .raw { background: #fafafa; padding: 8px; font-size: 12px; max-height: 200px; overflow: auto; }
 </style>

@@ -122,6 +122,18 @@ async def main() -> int:
         check([e["data"]["intents"] for e in has(evs, "routing")] == [["checkin"]], "场景5 routing=checkin")
         check("打卡" in text_of(evs), "场景5 打卡回复")
 
+        # 6.5) 场景 6/7:饮食(记录估算 + 食谱推荐)
+        evs = await sse(client, token, "午饭吃了200g鸡胸肉和一碗米饭")
+        check([e["data"]["intents"] for e in has(evs, "routing")] == [["diet"]], "场景6 routing=diet")
+        diet_cards = [c for c in has(evs, "card") if c["data"]["type"] == "diet"]
+        check(bool(diet_cards) and diet_cards[0]["data"]["payload"].get("mode") == "log", "场景6 饮食卡(log)")
+        evs = await sse(client, token, "帮我配明天的三餐")
+        reco_cards = [
+            c for c in has(evs, "card")
+            if c["data"]["type"] == "diet" and c["data"]["payload"].get("mode") == "recommend"
+        ]
+        check(bool(reco_cards), "场景7 食谱卡(recommend)")
+
         # 7) 看板 REST
         r = await client.get(f"{BASE}/api/v1/dashboard/overview", headers=H)
         check(r.status_code == 200 and "workout_7d" in r.json(), "dashboard/overview 结构正确")
