@@ -1,0 +1,60 @@
+{"text": "今天跑了5公里,体重68.2,睡了7个半小时,感觉不错", "expected": ["record"]}
+{"text": "昨天做了深蹲和硬拉,练了45分钟", "expected": ["record"]}
+{"text": "刚称了体重 67.8", "expected": ["record"]}
+{"text": "昨晚只睡了6个小时,今天有点累", "expected": ["record"]}
+{"text": "今天休息,哪儿也没去", "expected": ["record"]}
+{"text": "帮我记一下:慢跑30分钟", "expected": ["record"]}
+{"text": "今天游泳40分钟,感觉一般", "expected": ["record"]}
+{"text": "记录体重 68.5,睡眠 7小时", "expected": ["record"]}
+{"text": "前天骑行了20公里", "expected": ["record"]}
+{"text": "今天状态不错,就是有点困,睡了8小时", "expected": ["record"]}
+{"text": "体重又涨了,今早69.3", "expected": ["record"]}
+{"text": "昨晚熬夜了,只睡了5个半小时", "expected": ["record"]}
+{"text": "今天走了1万步", "expected": ["record"]}
+{"text": "打了个羽毛球,1小时,有点累", "expected": ["record"]}
+{"text": "记录一下:今天体重68,睡了7个小时,没运动", "expected": ["record"]}
+{"text": "今天的训练完成了", "expected": ["checkin"]}
+{"text": "今天的训练没做,太忙了", "expected": ["checkin"]}
+{"text": "打卡:完成了,体感4分", "expected": ["checkin"]}
+{"text": "今天只完成了一半", "expected": ["checkin"]}
+{"text": "力量训练做完了,有点累", "expected": ["checkin"]}
+{"text": "今天不想动,鸽了", "expected": ["checkin"]}
+{"text": "上午的任务完成了", "expected": ["checkin"]}
+{"text": "打卡,体感2分,太累了", "expected": ["checkin"]}
+{"text": "今天计划里的都做完了", "expected": ["checkin"]}
+{"text": "没完成,明天补", "expected": ["checkin"]}
+{"text": "我最近一个月状态怎么样?", "expected": ["analyze"]}
+{"text": "看看我这一周的数据", "expected": ["analyze"]}
+{"text": "最近睡眠怎么样", "expected": ["analyze"]}
+{"text": "我的体重变化趋势如何", "expected": ["analyze"]}
+{"text": "这半个月训练量够吗", "expected": ["analyze"]}
+{"text": "帮我分析一下最近两周", "expected": ["analyze"]}
+{"text": "我最近状态是不是不太好", "expected": ["analyze"]}
+{"text": "看一下近30天的统计", "expected": ["analyze"]}
+{"text": "这周训练了几次", "expected": ["analyze"]}
+{"text": "体重最近降了吗", "expected": ["analyze"]}
+{"text": "下周给我排训练计划", "expected": ["plan"]}
+{"text": "帮我安排下周的训练", "expected": ["plan"]}
+{"text": "下周要出差三天,帮我调整下计划", "expected": ["plan"]}
+{"text": "给我生成一份下周的健身计划", "expected": ["plan"]}
+{"text": "下周想多练点上肢", "expected": ["plan"]}
+{"text": "帮我排一个训练计划,周三周四没时间", "expected": ["plan"]}
+{"text": "该排下周的计划了吧", "expected": ["plan"]}
+{"text": "下周计划别排太狠,最近有点累", "expected": ["plan"]}
+{"text": "帮我重新安排下周", "expected": ["plan"]}
+{"text": "下周计划:多跑步,少力量", "expected": ["plan"]}
+{"text": "讲个笑话", "expected": ["out_of_scope"]}
+{"text": "今天天气怎么样", "expected": ["out_of_scope"]}
+{"text": "帮我订张机票", "expected": ["out_of_scope"]}
+{"text": "明天股票会涨吗", "expected": ["out_of_scope"]}
+{"text": "推荐一部电影", "expected": ["out_of_scope"]}
+{"text": "1+1等于几", "expected": ["out_of_scope"]}
+{"text": "帮我写一篇作文", "expected": ["out_of_scope"]}
+{"text": "你叫什么名字", "expected": ["out_of_scope"]}
+{"text": "看看这周状态,顺便排下周计划", "expected": ["analyze", "plan"]}
+{"text": "记录一下今天跑了5公里,再看看这周状态", "expected": ["record", "analyze"]}
+{"text": "今天训练完成了,帮我排下周计划", "expected": ["checkin", "plan"]}
+{"text": "体重68.2,睡了7小时,最近状态怎么样", "expected": ["record", "analyze"]}
+{"text": "帮我记一下今天的力量训练,另外看看最近一个月的趋势", "expected": ["record", "analyze"]}
+{"text": "打卡完成,顺便看下这周完成率", "expected": ["checkin", "analyze"]}
+{"text": "下周要出差,帮我调整计划,并看看最近的睡眠", "expected": ["plan", "analyze"]}

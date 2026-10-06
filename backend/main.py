@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.api.v1 import api_router
 from backend.config import get_settings
 from backend.core.llm import load_providers
 from backend.core.logger import configure_logging, get_logger
@@ -53,6 +54,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 业务 API(认证 / 对话 SSE / 看板 / 计划 / 打卡)
+app.include_router(api_router, prefix="/api/v1")
 
 # MCP 健康工具(挂载前缀 /mcp/health,实际调用地址 {prefix}/mcp)
 app.mount("/mcp/health", _health_app)
